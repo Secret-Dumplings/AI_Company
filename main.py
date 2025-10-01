@@ -15,4 +15,4 @@ class scheduling_agent(Agent.BaseAgent):
         super().__init__()
 
 schedule_agent = Agent.agent_list["scheduling_agent"]()
-print(schedule_agent.conversation_with_tool("你好，你现在有一个名为1c04ff44be9c4211bee0c58a385f23c3的AI同伴，请向他咨询现在天气"))
+schedule_agent.conversation_with_tool("你好，你现在有一个名为1c04ff44be9c4211bee0c58a385f23c3的AI同伴，请向他咨询现在天气")
