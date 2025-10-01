@@ -88,8 +88,8 @@ class Agent():
         )
         response.encoding = 'utf-8'
         full_content = ""
-        print(response.reason)
         for line in response.iter_lines(decode_unicode=True):
+            print(line)
             if not line:
                 continue
             line = line.strip()
