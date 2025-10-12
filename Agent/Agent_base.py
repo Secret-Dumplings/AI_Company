@@ -60,7 +60,6 @@ class Agent():
         "role":"system",
         "content":f"{self.prompt}"
         }]
-        print(response.status_code)
         if response.status_code != 200:
             return False
 
@@ -136,6 +135,7 @@ class Agent():
         # 一次性执行所有工具，并把结果汇总
         tool_results = []
         for block in xml_blocks:
+            print("发现:", block)
             try:
                 tool_results.append("暂时没有工具可调用")
             except Exception as e:
@@ -145,7 +145,7 @@ class Agent():
             # 把所有工具结果一次性给 AI，让它继续思考
             self.history.append({"role": "system",
                                  "content": "工具返回：\n" + "\n".join(tool_results)})
-            full_content = self.conversation_with_tool()  # 只再请求一次
+            # full_content = self.conversation_with_tool()  # 只再请求一次
 
         # 最终保存
         self.history.append({"role": "assistant", "content": full_content})
