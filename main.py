@@ -15,5 +15,5 @@ class scheduling_agent(Agent.BaseAgent):
         super().__init__()
 
 schedule_agent = Agent.agent_list["scheduling_agent"]()
-schedule_agent.conversation_with_tool("你好")
+# schedule_agent.conversation_with_tool("你好")
 schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮忙")
