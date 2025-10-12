@@ -1,3 +1,4 @@
+import os
 import Agent
 import uuid
 
@@ -7,9 +8,9 @@ import uuid
 class scheduling_agent(Agent.BaseAgent):
     def __init__(self):
         self.prompt = "你是一个名为汤圆Agent的AGI"
-        self.api_provider = "https://api-inference.modelscope.cn/v1/chat/completions"
-        self.model_name = "Qwen/Qwen3-Coder-480B-A35B-Instruct"
-        self.api_key = 'ms-84fd9d0c-e7a2-4964-8efd-a9117f93caa3'
+        self.api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+        self.model_name = "qwen3-max"
+        self.api_key = os.environ.get("API_KEY")
         super().__init__()
 
 schedule_agent = Agent.agent_list["scheduling_agent"]()

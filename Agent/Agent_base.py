@@ -68,9 +68,7 @@ class Agent():
         return True
     def conversation_with_tool(self, messages = None) -> str:
         if messages:
-            print("包含messages")
             self.history.append({"role": "user", "content": messages})
-        print("正在请求")
         request_body = {
             "model": self.model_name,
             "messages": self.history,
@@ -89,8 +87,6 @@ class Agent():
             stream=True
         )
         response.encoding = 'utf-8'
-        print("正在获取sse回复")
-        print(response.text)
         full_content = ""
         for line in response.iter_lines(decode_unicode=True):
             if not line:
