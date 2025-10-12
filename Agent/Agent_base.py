@@ -54,9 +54,6 @@ class Agent:
 
     # ================= 主对话函数 =================
     def conversation_with_tool(self, messages=None) -> str:
-        if messages:
-            self.history.append({"role": "user", "content": messages})
-
         payload = {
             "model": self.model_name,
             "messages": self.history,
@@ -118,7 +115,7 @@ class Agent:
                 raise AttributeError(f"tools.py 里没有函数 {tool_name}")
             func = getattr(tools, tool_name)
             result = func(block)
-            tool_results.append(str(result))
+            tool_results.append(result)
 
         # 再把助手回复存历史
         self.history.append({"role": "assistant", "content": full_content})
@@ -126,10 +123,13 @@ class Agent:
         if "<attempt_completion>" in full_content:
             print("\n[系统] AI 已标记任务完成，程序退出。")
             exit(0)
+        if xml_blocks:
+            exit(0)
 
         if tool_results:
-                self.history.append({"role": "system",
-                                     "content": "工具返回：\n" + "\n".join(tool_results)})
+                print("成功执行:",tool_results)
+                self.history.extend(tool_results)
+                print(self.history)
                 self.conversation_with_tool()
 
         return full_content

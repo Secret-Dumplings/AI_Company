@@ -7,6 +7,7 @@ def register_agent(uuid, name):
     两个键指向**同一个类对象**，因此内存中只有一份。
     """
     def _decorator(cls):
+        cls.uuid = uuid
         agent_list[uuid] = cls
         agent_list[name] = cls
         return cls              # 原样返回，不影响类本身
