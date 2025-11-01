@@ -65,7 +65,7 @@ API_KEY=your_api_key_here
 ```python
 @Agent.register_agent(uuid.uuid4().hex, "agent_name")
 class MyAgent(Agent.BaseAgent):
-    prompt = "智能体的角色描述"
+    prompt = "智能体的角色提示词"
     api_provider = "API端点"
     model_name = "模型名称"
     api_key = os.getenv("API_KEY")
