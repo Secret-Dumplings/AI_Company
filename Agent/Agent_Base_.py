@@ -68,7 +68,6 @@ class Agent(ABC):
 
     # ---------------- 主对话函数 ----------------
     def conversation_with_tool(self, messages=None) -> str:
-        print(messages)
         if messages:
             self.history.append({"role": "user", "content": messages})
         payload = {
@@ -87,7 +86,6 @@ class Agent(ABC):
         )
         rsp.encoding = 'utf-8'
 
-        # ---------- 流式收数据 ----------
         full_content = ""
         for line in rsp.iter_lines(decode_unicode=True):
             if not line or not line.startswith('data: '):
@@ -99,25 +97,30 @@ class Agent(ABC):
                 chunk = json.loads(data)
             except json.JSONDecodeError:
                 continue
-
             delta = (chunk.get('choices') or [{}])[0].get('delta') or {}
             content = delta.get('content', '')
             if content:
                 full_content += content
                 print(content, end='', flush=True)
-
             usage = chunk.get('usage')
             if usage:
                 print(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
                       f"生成 {usage['completion_tokens']} tokens，"
                       f"总计 {usage['total_tokens']} tokens。")
 
-        # ---------- 工具调用 ----------
-        clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
+        # 1. 去掉工具块后再存历史，防止循环触发
         xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
+        clean_for_history = xml_pattern.sub('', full_content).strip()
+        self.history.append({"role": "assistant", "content": clean_for_history})
+
+        if "<attempt_completion>" in full_content:
+            print("\n[系统] AI 已标记任务完成，程序退出。")
+            sys.exit(0)
+
+        # 2. 提取并执行工具
+        clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
         clean_content = clean_pattern.sub('', full_content)
         xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
-
         tool_results = []
         for block in xml_blocks:
             print("\n发现工具块:", block)
@@ -126,25 +129,17 @@ class Agent(ABC):
             if root is None:
                 raise ValueError("空 XML")
             tool_name = root.name
-            if not hasattr(self, tool_name):          # 在本类里找工具函数
+            if not hasattr(self, tool_name):
                 raise AttributeError(f"类里找不到工具函数 {tool_name}")
             func = getattr(self, tool_name)
             result = func(block)
             tool_results.append(result)
 
-        # 把助手回复存历史
-        self.history.append({"role": "assistant", "content": full_content})
-
-        if "<attempt_completion>" in full_content:
-            print("\n[系统] AI 已标记任务完成，程序退出。")
-            sys.exit(0)
-
+        # 3. 若工具产生结果，继续对话
+        # 工具结果不再伪装成用户，而是作为系统级反馈
         if tool_results:
             print("成功执行:", tool_results)
-            self.history.extend(tool_results)
-            print(self.history)
             return self.conversation_with_tool()
-
         return full_content
 
     # =================================================================
@@ -181,7 +176,6 @@ class Agent(ABC):
             return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
 
         target_ins = target_cls
-        reply = target_ins.conversation_with_tool(
-            {"role": agent_id, "content": message}
-        )
-        return {"role": agent_id, "content": reply}
+        reply = target_ins.conversation_with_tool(message)
+        self.history.append({"role": "assistant", "content": reply})
+        return reply
