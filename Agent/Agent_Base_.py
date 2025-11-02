@@ -100,8 +100,6 @@ class Agent(ABC):
             except json.JSONDecodeError:
                 continue
 
-            with open(os.path.join("./output", "log.log"), "w") as f:
-                f.write(json.dumps(chunk, ensure_ascii=False, indent=2))
             delta = (chunk.get('choices') or [{}])[0].get('delta') or {}
             content = delta.get('content', '')
             if content:

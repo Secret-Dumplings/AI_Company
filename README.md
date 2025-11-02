@@ -27,6 +27,12 @@ AI Company 是一个基于大语言模型的多智能体系统框架，允许创
 - `Agent/tools.py` - 工具函数实现
 - `Agent/agent.py` - 智能体相关功能
 
+### 文件树
+- Agent
+  - __init__.py
+  - Agent_Base_.py
+  - Agent_list.py
+  - 
 ## 安装与配置
 
 ### 环境要求
