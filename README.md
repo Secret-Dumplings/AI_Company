@@ -106,4 +106,4 @@ uv run main.py
 
 ## 许可证
 
-MIT License
+[Apache-2.0 license](https://github.com/Secret-Dumplings/AI_Company#Apache-2.0-1-ov-file)
