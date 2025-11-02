@@ -31,7 +31,7 @@ class Agent(ABC):
 
     # ---------------- 通用构造 ----------------
     def __init__(self):
-        self.uuid = self.__class__.uuid
+        self.uuid=self.__class__.uuid
         prompt = self.prompt + ", 你的uuid " + str(self.uuid)
         print(prompt)
         self.history = [{"role": "system", "content": prompt}]
@@ -180,7 +180,7 @@ class Agent(ABC):
         except KeyError as e:
             return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
 
-        target_ins = target_cls()
+        target_ins = target_cls
         reply = target_ins.conversation_with_tool(
             {"role": agent_id, "content": message}
         )
