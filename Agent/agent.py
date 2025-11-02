@@ -1,4 +1,4 @@
-print("这个只是测试代码，已放弃维护")
+1/0 #执行删除禁止误处
 import json
 import sys
 import time

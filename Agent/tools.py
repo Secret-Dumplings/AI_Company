@@ -35,4 +35,4 @@ def ask_for_help(xml_block: str):
     reply = target_ins.conversation_with_tool(
         f"{message} ——来自{send_id}"
     )
-    return {"role": agent_id,"content": reply}
+    return {"role": "assistant","content": {agent_id: reply}}
