@@ -4,8 +4,11 @@ import platform
 import requests
 import re
 import sys
-from abc import ABC, abstractmethod          # 新增
+from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
+from loguru import logger #配置日志
+logger.add("logs/app.log", rotation="500 MB", retention="10 days", compression="zip")
+
 
 class Agent(ABC):
     """
@@ -33,7 +36,8 @@ class Agent(ABC):
     def __init__(self):
         self.uuid=self.__class__.uuid
         prompt = self.prompt + ", 你的uuid " + str(self.uuid)
-        print(prompt)
+        logger.info("prompt:"+str(prompt))
+        # print(prompt)
         self.history = [{"role": "system", "content": prompt}]
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -101,10 +105,10 @@ class Agent(ABC):
             content = delta.get('content', '')
             if content:
                 full_content += content
-                print(content, end='', flush=True)
+                self.out(content)
             usage = chunk.get('usage')
             if usage:
-                print(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
+                self.out(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
                       f"生成 {usage['completion_tokens']} tokens，"
                       f"总计 {usage['total_tokens']} tokens。")
 
@@ -114,7 +118,7 @@ class Agent(ABC):
         self.history.append({"role": "assistant", "content": clean_for_history})
 
         if "<attempt_completion>" in full_content:
-            print("\n[系统] AI 已标记任务完成，程序退出。")
+            self.out("\n[系统] AI 已标记任务完成，程序退出。")
             sys.exit(0)
 
         # 2. 提取并执行工具
@@ -123,7 +127,8 @@ class Agent(ABC):
         xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
         tool_results = []
         for block in xml_blocks:
-            print("\n发现工具块:", block)
+            logger.info("\n发现工具块:"+str(block))
+            # print("\n发现工具块:", block)
             soup = BeautifulSoup(block, "xml")
             root = soup.find()
             if root is None:
@@ -138,7 +143,8 @@ class Agent(ABC):
         # 3. 若工具产生结果，继续对话
         # 工具结果不再伪装成用户，而是作为系统级反馈
         if tool_results:
-            print("成功执行:", tool_results)
+            logger.info("成功执行"+str(tool_results))
+            # print("成功执行:", tool_results)
             return self.conversation_with_tool()
         return full_content
 
@@ -179,3 +185,5 @@ class Agent(ABC):
         reply = target_ins.conversation_with_tool(message)
         self.history.append({"role": "assistant", "content": reply})
         return reply
+    def out(self, content: str):
+        print(content, end='', flush=True)
