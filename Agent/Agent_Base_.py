@@ -127,74 +127,61 @@ class Agent(ABC):
         xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
         tool_results = []
         for block in xml_blocks:
-            logger.info("\n发现工具块:"+str(block))
-            # print("\n发现工具块:", block)
+            logger.info("\n发现工具块:" + str(block))
             soup = BeautifulSoup(block, "xml")
             root = soup.find()
             if root is None:
                 raise ValueError("空 XML")
             tool_name = root.name
+
+            # 检查工具权限
+            if not tool_registry.check_permission(self.name, tool_name):
+                # 检查是否有类似工具可以推荐
+                available_tools = self._get_available_tools_for_agent()
+                similar_tools = self._find_similar_tools(tool_name, available_tools)
+
+                permission_error = f"权限错误：Agent '{self.name}' 没有权限使用工具 '{tool_name}'。"
+                if similar_tools:
+                    permission_error += f" 你可以使用以下类似的工具：{', '.join(similar_tools)}"
+                else:
+                    permission_error += f" 你有权限使用的工具包括：{', '.join(available_tools)}"
+
+                self.history.append({"role": "system", "content": permission_error})
+                tool_results.append({"error": permission_error})
+                continue
+
             if not hasattr(self, tool_name):
                 raise AttributeError(f"类里找不到工具函数 {tool_name}")
+
             func = getattr(self, tool_name)
             result = func(block)
             tool_results.append(result)
 
         # 3. 若工具产生结果，继续对话
-        # 工具结果不再伪装成用户，而是作为系统级反馈
         if tool_results:
-            logger.info("成功执行"+str(tool_results))
-            # print("成功执行:", tool_results)
+            logger.info("成功执行" + str(tool_results))
             return self.conversation_with_tool()
         return full_content
 
-    # =================================================================
-    #  以下区域 = 以前 tools.py 里的所有函数，直接搬进类里当实例方法
-    # =================================================================
-    def ask_for_help(self, xml_block: str):
-        """
-        实例方法版 ask_for_help，可直接访问 self.__class__.agent_list
-        """
-        from bs4 import BeautifulSoup   # 方法内 import 避免循环
-        soup = BeautifulSoup(xml_block, "xml")
+    def _get_available_tools_for_agent(self) -> list[str]:
+        """获取当前agent有权限使用的所有工具"""
+        available_tools = []
+        for tool_name, tool_info in tool_registry.list_tools().items():
+            if tool_registry.check_permission(self.name, tool_name):
+                available_tools.append(tool_name)
+        return available_tools
 
-        agent_id_tag = soup.find("agent_id")
-        message_tag = soup.find("message")
-        send_id_tag = self.uuid
+    def _find_similar_tools(self, tool_name: str, available_tools: List[str]) -> List[str]:
+        """查找相似的工具名称"""
+        # 简单的字符串匹配，可以根据需要实现更复杂的相似度算法
+        similar_tools = []
+        for available_tool in available_tools:
+            if tool_name.lower() in available_tool.lower() or available_tool.lower() in tool_name.lower():
+                similar_tools.append(available_tool)
+        return similar_tools[:3]  # 最多返回3个相似工具
 
-        if agent_id_tag is None:
-            return {"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"}
-        if message_tag is None:
-            return {"role": "system", "content": "<ask_for_help> 缺少 message 字段"}
-        if send_id_tag is None:
-            return {"role": "system", "content": "<ask_for_help> 缺少 your_id 字段"}
-
-        agent_id = agent_id_tag.text.strip()
-        message = message_tag.text.strip()
-        send_id = send_id_tag
-
-        try:
-            from Agent import agent_list
-
-            target_cls = agent_list[agent_id]
-            sender_cls = agent_list[send_id]
-        except KeyError as e:
-            return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
-
-        target_ins = target_cls
-        reply = target_ins.conversation_with_tool(message)
-        self.history.append({"role": "assistant", "content": reply})
-        return reply
-    def attempt_completion(self, xml_block: str):
-        from bs4 import BeautifulSoup   # 方法内 import 避免循环
-        soup = BeautifulSoup(xml_block, "xml")
-
-        report_content_tag = soup.find("report_content")
-
-        if report_content_tag is None:
-            sys.exit(0)
-
-        print(report_content_tag.strip())
+    def out(self, content: str):
+        print(content, end='', flush=True)
 
     def out(self, content: str):
         print(content, end='', flush=True)
