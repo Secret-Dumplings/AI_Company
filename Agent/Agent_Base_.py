@@ -185,5 +185,16 @@ class Agent(ABC):
         reply = target_ins.conversation_with_tool(message)
         self.history.append({"role": "assistant", "content": reply})
         return reply
+    def attempt_completion(self, xml_block: str):
+        from bs4 import BeautifulSoup   # 方法内 import 避免循环
+        soup = BeautifulSoup(xml_block, "xml")
+
+        report_content_tag = soup.find("report_content")
+
+        if report_content_tag is None:
+            sys.exit(0)
+
+        print(report_content_tag.strip())
+
     def out(self, content: str):
         print(content, end='', flush=True)
