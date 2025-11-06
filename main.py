@@ -2,14 +2,14 @@ import sys
 
 from dotenv import load_dotenv
 import os
-import Agent
+import Dumplings
 import uuid
-from Agent import tool_creater
+# from Dumplings import tool_registry
 
 load_dotenv()
 
-@Agent.register_agent(uuid.uuid4().hex, "scheduling_agent")
-class scheduling_agent(Agent.BaseAgent):
+@Dumplings.register_agent(uuid.uuid4().hex, "scheduling_agent")
+class scheduling_agent(Dumplings.BaseAgent):
     prompt = f"你是一个名为汤圆Agent的AGI，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签退出对话， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     model_name = "qwen3-max"
@@ -17,8 +17,8 @@ class scheduling_agent(Agent.BaseAgent):
     def __init__(self):
         super().__init__()
 
-@Agent.register_agent("8841cd45eef54217bc8122cafebe5fd6", "time_guide")
-class time_agent(Agent.BaseAgent):
+@Dumplings.register_agent("8841cd45eef54217bc8122cafebe5fd6", "time_guide")
+class time_agent(Dumplings.BaseAgent):
     prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯， 现在的时间是16:15"
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     model_name = "qwen3-max"
@@ -26,17 +26,26 @@ class time_agent(Agent.BaseAgent):
     def __init__(self):
         super().__init__()
 
-schedule_agent = Agent.agent_list["scheduling_agent"]
+from Dumplings import tool_registry
+
+print("注册的工具列表：")
+for name, info in tool_registry.list_tools().items():
+    print(f"工具：{name}，允许的 agents：{info['allowed_agents']}")
+
+print("UUID 映射表：")
+print(tool_registry._uuid_to_name)
+
+schedule_agent = Dumplings.agent_list["scheduling_agent"]
 # schedule_agent.conversation_with_tool("你好")
 schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
 
 
 #tools
-@tool_creater.register_tool(
+@Dumplings.tool_registry.register_tool(
     allowed_agents=None,
     description="""
         一、语法结构（Syntax）
-        该函数用于一个 Agent 向另一个 Agent 发起请求，使用 XML 格式 描述请求内容。
+        该函数用于一个 Dumplings 向另一个 Dumplings 发起请求，使用 XML 格式 描述请求内容。
         正确语法格式：
         <request>
             <agent_id>目标Agent的ID</agent_id>
@@ -47,48 +56,48 @@ schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc
         必须包含 <agent_id> 和 <message> 两个字段。
         XML 标签不能交叉嵌套，必须正确闭合。
         二、功能作用（Purpose）
-        ask_for_help 是 Agent 之间通信的桥梁，主要实现以下功能：
+        ask_for_help 是 Dumplings 之间通信的桥梁，主要实现以下功能：
         | 功能点 | 说明 |
         | --- | --- | 
-        | 跨Agent通信 | 允许一个 Agent 向另一个指定 Agent 发送消息。 |
+        | 跨Agent通信 | 允许一个 Dumplings 向另一个指定 Dumplings 发送消息。 |
         | 任务协作 | 支持任务分发、请求处理、结果返回等协作行为。 |
-        | 自动路由 | 系统根据 agent_id 自动找到目标 Agent 并转发消息。 |
-        | 上下文记录	请求和响应会自动记录到当前 Agent 的 history 中，便于后续追踪。 |
+        | 自动路由 | 系统根据 agent_id 自动找到目标 Dumplings 并转发消息。 |
+        | 上下文记录	请求和响应会自动记录到当前 Dumplings 的 history 中，便于后续追踪。 |
         三、使用效果（Effect）
         成功调用后：
-        目标 Agent 收到消息并处理。
-        当前 Agent 收到目标 Agent 的响应内容。
-        响应内容会自动追加到当前 Agent 的历史记录中，格式如下：
+        目标 Dumplings 收到消息并处理。
+        当前 Dumplings 收到目标 Dumplings 的响应内容。
+        响应内容会自动追加到当前 Dumplings 的历史记录中，格式如下：
         {"role": "assistant", "content": "目标Agent的回复内容"}
         调用失败时：
         系统将返回一个错误提示，格式如下：
         {"role": "system", "content": "错误信息"}
         常见错误包括：
         缺少 <agent_id> 或 <message> 标签
-        找不到目标 Agent
-        当前 Agent 没有设置 uuid
+        找不到目标 Dumplings
+        当前 Dumplings 没有设置 uuid
         四、使用示例（Example）
-        示例 1：向 Agent "writer" 请求撰写文章
+        示例 1：向 Dumplings "writer" 请求撰写文章
         <request>
             <agent_id>writer</agent_id>
             <message>请帮我写一篇关于人工智能的科普文章</message>
         </request>
         效果：
-        系统会将消息发送给 ID 为 writer 的 Agent，并返回其生成的文章内容。
-        示例 2：向 Agent "coder" 请求生成代码
+        系统会将消息发送给 ID 为 writer 的 Dumplings，并返回其生成的文章内容。
+        示例 2：向 Dumplings "coder" 请求生成代码
         <request>
             <agent_id>coder</agent_id>
             <message>请用Python写一个快速排序函数</message>
         </request>
         效果：
         系统会将请求发送给 coder，并返回排序函数的代码。
-        五、Agent 使用建议（Best Practice）
+        五、Dumplings 使用建议（Best Practice）
         使用标准 XML 格式	保证标签闭合、嵌套正确，避免解析失败。
-        明确目标 Agent ID	确保 agent_id 在系统中唯一且已注册。
-        消息内容简洁清晰	提高目标 Agent 的理解和处理效率。
+        明确目标 Dumplings ID	确保 agent_id 在系统中唯一且已注册。
+        消息内容简洁清晰	提高目标 Dumplings 的理解和处理效率。
         检查返回内容	判断是否为错误提示，避免误用无效结果。
         六、总结（Summary）
-        ask_for_help 是 Agent 之间协作的核心通信接口，采用 XML 格式描述请求，具备自动路由、上下文记录和错误处理机制。正确使用该函数，可实现高效、灵活的多 Agent 协作系统。
+        ask_for_help 是 Dumplings 之间协作的核心通信接口，采用 XML 格式描述请求，具备自动路由、上下文记录和错误处理机制。正确使用该函数，可实现高效、灵活的多 Dumplings 协作系统。
     """,
     name="ask_for_help"
 )
@@ -115,7 +124,7 @@ def ask_for_help(self, xml_block: str):
     send_id = send_id_tag
 
     try:
-        from Agent import agent_list
+        from Dumplings import agent_list
 
         target_cls = agent_list[agent_id]
         sender_cls = agent_list[send_id]
@@ -127,7 +136,7 @@ def ask_for_help(self, xml_block: str):
     self.history.append({"role": "assistant", "content": reply})
     return reply
 
-@tool_creater.register_tool(
+@Dumplings.tool_registry.register_tool(
     allowed_agents=None,
     description="""
         一、语法结构（Syntax）
@@ -145,7 +154,7 @@ def ask_for_help(self, xml_block: str):
         标签必须正确闭合
         内容放在 <report_content> 和 </report_content> 之间
         二、功能作用（Purpose）
-        attempt_completion 是 Agent 报告任务完成情况的标准接口，主要实现以下功能：
+        attempt_completion 是 Dumplings 报告任务完成情况的标准接口，主要实现以下功能：
         表格
         复制
         功能点	说明
@@ -232,7 +241,7 @@ def ask_for_help(self, xml_block: str):
         </report>
         结果：
         输出错误：report_content 标签内容为空
-        六、Agent 使用建议（Best Practice）
+        六、Dumplings 使用建议（Best Practice）
         表格
         复制
         建议	说明
@@ -241,8 +250,8 @@ def ask_for_help(self, xml_block: str):
         ✅ 适当的格式化	使用换行符、缩进等提高可读性
         ✅ 检查返回值	确认报告是否成功处理
         七、总结（Summary）
-        attempt_completion 是 Agent 完成任务后提交报告的标准接口，采用 XML 格式描述报告内容，具备自动解析、内容提取和错误处理功能。正确使用该函数，可实现标准化的任务完成报告机制。
-        适用对象： 所有支持 attempt_completion 接口的 Agent 实例
+        attempt_completion 是 Dumplings 完成任务后提交报告的标准接口，采用 XML 格式描述报告内容，具备自动解析、内容提取和错误处理功能。正确使用该函数，可实现标准化的任务完成报告机制。
+        适用对象： 所有支持 attempt_completion 接口的 Dumplings 实例
         推荐场景： 任务完成报告、状态汇报、结果统计、执行摘要等
     """,
     name="attempt_completion"
@@ -257,3 +266,5 @@ def attempt_completion(self, xml_block: str):
         sys.exit(0)
 
     print(report_content_tag.strip())
+
+

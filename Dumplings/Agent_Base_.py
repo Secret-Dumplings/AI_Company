@@ -7,12 +7,13 @@ import sys
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
 from loguru import logger #配置日志
+from .agent_tool import tool_registry
 logger.add("logs/app.log", rotation="500 MB", retention="10 days", compression="zip")
 
 
 class Agent(ABC):
     """
-    抽象基类，所有具体 Agent 必须实现四个抽象属性：
+    抽象基类，所有具体 Dumplings 必须实现四个抽象属性：
         api_key
         api_provider
         model_name
@@ -35,6 +36,10 @@ class Agent(ABC):
     # ---------------- 通用构造 ----------------
     def __init__(self):
         self.uuid=self.__class__.uuid
+        from .agent_tool import tool_registry
+        agent_name = getattr(self.__class__, 'name', None) or getattr(self.__class__, '__name__', None)
+        if agent_name and self.uuid:
+            tool_registry.register_agent_uuid(self.uuid, agent_name)
         prompt = self.prompt + ", 你的uuid " + str(self.uuid)
         logger.info("prompt:"+str(prompt))
         # print(prompt)
@@ -135,12 +140,12 @@ class Agent(ABC):
             tool_name = root.name
 
             # 检查工具权限
-            if not tool_registry.check_permission(self.name, tool_name):
+            if not tool_registry.check_permission(self.uuid, tool_name):
                 # 检查是否有类似工具可以推荐
                 available_tools = self._get_available_tools_for_agent()
                 similar_tools = self._find_similar_tools(tool_name, available_tools)
 
-                permission_error = f"权限错误：Agent '{self.name}' 没有权限使用工具 '{tool_name}'。"
+                permission_error = f"权限错误：Dumplings '{self.uuid}' 没有权限使用工具 '{tool_name}'。"
                 if similar_tools:
                     permission_error += f" 你可以使用以下类似的工具：{', '.join(similar_tools)}"
                 else:
@@ -171,7 +176,7 @@ class Agent(ABC):
                 available_tools.append(tool_name)
         return available_tools
 
-    def _find_similar_tools(self, tool_name: str, available_tools: List[str]) -> List[str]:
+    def _find_similar_tools(self, tool_name: str, available_tools: list[str]) -> list[str]:
         """查找相似的工具名称"""
         # 简单的字符串匹配，可以根据需要实现更复杂的相似度算法
         similar_tools = []

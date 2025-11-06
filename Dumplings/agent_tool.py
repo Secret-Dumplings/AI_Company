@@ -1,13 +1,20 @@
+from loguru import logger #配置日志
+logger.add("logs/app.log", rotation="500 MB", retention="10 days", compression="zip")
 from functools import wraps
 from typing import List, Union, Optional
 
 
-class ToolRegistry:
+class tool:
     """工具注册管理器"""
 
     def __init__(self):
         self._tools = {}  # 存储工具信息
         self._agent_permissions = {}  # 存储agent权限
+        self._uuid_to_name = {} #转换name与uuid
+
+    def register_agent_uuid(self, uuid: str, name: str):
+        """注册 agent 的 uuid 和 name 映射"""
+        self._uuid_to_name[uuid] = name
 
     def register_tool(self,
                       allowed_agents: Union[str, List[str]] = None,
@@ -41,6 +48,13 @@ class ToolRegistry:
                 'name': tool_name
             }
 
+            logger.info(str({
+                'function': func,
+                'allowed_agents': permitted_agents,
+                'description': description,
+                'name': tool_name
+            }))
+
             @wraps(func)
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
@@ -50,14 +64,20 @@ class ToolRegistry:
         return decorator
 
     def check_permission(self, agent_name: str, tool_name: str) -> bool:
-        """检查agent是否有权限使用指定工具"""
+        """检查 agent 是否有权限使用指定工具，支持 uuid 自动识别"""
         if tool_name not in self._tools:
             return False
+
+        # 如果 agent_name 是 uuid，自动转换为 name
+        try:
+            logger.info("成功转换"+agent_name+" to "+self._uuid_to_name[agent_name])
+            agent_name = self._uuid_to_name[agent_name]
+        except:
+            logger.info("传入name无需转换")
 
         tool_info = self._tools[tool_name]
         allowed_agents = tool_info['allowed_agents']
 
-        # 如果allowed_agents为None，表示所有agent都有权限
         if allowed_agents is None:
             return True
 
@@ -76,4 +96,4 @@ class ToolRegistry:
 
 
 # 创建全局工具注册实例
-tool_registry = ToolRegistry()
+tool_registry = tool()
