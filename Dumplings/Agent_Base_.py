@@ -155,10 +155,11 @@ class Agent(ABC):
                 tool_results.append({"error": permission_error})
                 continue
 
-            if not hasattr(self, tool_name):
-                raise AttributeError(f"类里找不到工具函数 {tool_name}")
+            tool_info = tool_registry.get_tool_info(tool_name)
+            if tool_info is None:
+                raise AttributeError(f"工具 {tool_name} 未注册")
 
-            func = getattr(self, tool_name)
+            func = tool_info['function']
             result = func(block)
             tool_results.append(result)
 

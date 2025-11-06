@@ -26,34 +26,21 @@ class time_agent(Dumplings.BaseAgent):
     def __init__(self):
         super().__init__()
 
-from Dumplings import tool_registry
 
-print("注册的工具列表：")
-for name, info in tool_registry.list_tools().items():
-    print(f"工具：{name}，允许的 agents：{info['allowed_agents']}")
-
-print("UUID 映射表：")
-print(tool_registry._uuid_to_name)
-
-schedule_agent = Dumplings.agent_list["scheduling_agent"]
-# schedule_agent.conversation_with_tool("你好")
-schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
-
-
-#tools
 @Dumplings.tool_registry.register_tool(
     allowed_agents=None,
     description="""
         一、语法结构（Syntax）
         该函数用于一个 Dumplings 向另一个 Dumplings 发起请求，使用 XML 格式 描述请求内容。
         正确语法格式：
-        <request>
+        <ask_for_help>
             <agent_id>目标Agent的ID</agent_id>
             <message>你要发送的消息内容</message>
-        </request>
+            <send_id>你的id</send_id>>
+        </ask_for_help>
         注意事项：
         所有标签必须 成对出现，且 大小写敏感。
-        必须包含 <agent_id> 和 <message> 两个字段。
+        必须包含 <agent_id>  <message> 两个字段。
         XML 标签不能交叉嵌套，必须正确闭合。
         二、功能作用（Purpose）
         ask_for_help 是 Dumplings 之间通信的桥梁，主要实现以下功能：
@@ -78,16 +65,18 @@ schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc
         当前 Dumplings 没有设置 uuid
         四、使用示例（Example）
         示例 1：向 Dumplings "writer" 请求撰写文章
-        <request>
+        <ask_for_help>
             <agent_id>writer</agent_id>
             <message>请帮我写一篇关于人工智能的科普文章</message>
-        </request>
+            <send_id>writer</send_id>
+        </ask_for_help>
         效果：
         系统会将消息发送给 ID 为 writer 的 Dumplings，并返回其生成的文章内容。
         示例 2：向 Dumplings "coder" 请求生成代码
         <request>
             <agent_id>coder</agent_id>
             <message>请用Python写一个快速排序函数</message>
+            <send_id>26a72cec90af48f4ae216efe4a69f094</send_id>
         </request>
         效果：
         系统会将请求发送给 coder，并返回排序函数的代码。
@@ -101,7 +90,7 @@ schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc
     """,
     name="ask_for_help"
 )
-def ask_for_help(self, xml_block: str):
+def ask_for_help(xml_block: str):
     """
     实例方法版 ask_for_help，可直接访问 self.__class__.agent_list
     """
@@ -110,8 +99,7 @@ def ask_for_help(self, xml_block: str):
 
     agent_id_tag = soup.find("agent_id")
     message_tag = soup.find("message")
-    send_id_tag = self.uuid
-
+    send_id_tag = soup.find("send_id")
     if agent_id_tag is None:
         return {"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"}
     if message_tag is None:
@@ -133,7 +121,7 @@ def ask_for_help(self, xml_block: str):
 
     target_ins = target_cls
     reply = target_ins.conversation_with_tool(message)
-    self.history.append({"role": "assistant", "content": reply})
+    sender_cls.history.append({"role": "assistant", "content": reply})
     return reply
 
 @Dumplings.tool_registry.register_tool(
@@ -256,7 +244,7 @@ def ask_for_help(self, xml_block: str):
     """,
     name="attempt_completion"
 )
-def attempt_completion(self, xml_block: str):
+def attempt_completion(xml_block: str):
     from bs4 import BeautifulSoup  # 方法内 import 避免循环
     soup = BeautifulSoup(xml_block, "xml")
 
@@ -267,4 +255,8 @@ def attempt_completion(self, xml_block: str):
 
     print(report_content_tag.strip())
 
+
+schedule_agent = Dumplings.agent_list["scheduling_agent"]
+# schedule_agent.conversation_with_tool("你好")
+schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
 
