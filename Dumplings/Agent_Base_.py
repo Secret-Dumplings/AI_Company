@@ -122,10 +122,6 @@ class Agent(ABC):
         clean_for_history = xml_pattern.sub('', full_content).strip()
         self.history.append({"role": "assistant", "content": clean_for_history})
 
-        if "<attempt_completion>" in full_content:
-            self.out("\n[系统] AI 已标记任务完成，程序退出。")
-            sys.exit(0)
-
         # 2. 提取并执行工具
         clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
         clean_content = clean_pattern.sub('', full_content)
@@ -162,6 +158,10 @@ class Agent(ABC):
             func = tool_info['function']
             result = func(block)
             tool_results.append(result)
+        #如配置错误强制跳出避免堵塞
+        if "<attempt_completion>" in full_content:
+            self.out("\n[系统] AI 已标记任务完成，程序退出。")
+            sys.exit(0)
 
         # 3. 若工具产生结果，继续对话
         if tool_results:
@@ -189,5 +189,47 @@ class Agent(ABC):
     def out(self, content: str):
         print(content, end='', flush=True)
 
-    def out(self, content: str):
-        print(content, end='', flush=True)
+    def ask_for_help(self, xml_block: str):
+        """
+        实例方法版 ask_for_help，可直接访问 self.__class__.agent_list
+        """
+        from bs4 import BeautifulSoup  # 方法内 import 避免循环
+        soup = BeautifulSoup(xml_block, "xml")
+
+        agent_id_tag = soup.find("agent_id")
+        message_tag = soup.find("message")
+        if agent_id_tag is None:
+            self.history.append({"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"})
+            return {"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"}
+        if message_tag is None:
+            self.history.append({"role": "system", "content": "<ask_for_help> 缺少 message 字段"})
+            return {"role": "system", "content": "<ask_for_help> 缺少 message 字段"}
+
+        agent_id = agent_id_tag.text.strip()
+        message = message_tag.text.strip()
+
+        try:
+            from Dumplings import agent_list
+
+            target_cls = agent_list[agent_id]
+        except KeyError as e:
+            self.history.append({"role": "system", "content": f"未找到 uuid/别名 {e}"})
+            return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
+
+        target_ins = target_cls
+        reply = target_ins.conversation_with_tool(message)
+        self.history.append({"role": "assistant", "content": reply})
+        return reply
+
+    def attempt_completion(self, xml_block: str):
+        from bs4 import BeautifulSoup  # 方法内 import 避免循环
+        soup = BeautifulSoup(xml_block, "xml")
+
+        report_content_tag = soup.find("report_content")
+
+        if report_content_tag is None:
+            sys.exit(0)
+
+        print(report_content_tag.strip())
+        sys.exit(0)
+
