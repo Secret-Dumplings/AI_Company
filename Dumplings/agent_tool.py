@@ -33,7 +33,6 @@ from typing import List, Union, Optional
 
 class tool:
     """工具注册管理器（超详细日志版）"""
-
     def __init__(self):
         self._tools: dict = {}              # name -> info
         self._agent_permissions: dict = {}  # 预留

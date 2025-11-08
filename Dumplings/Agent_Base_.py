@@ -76,7 +76,7 @@ class Agent(ABC):
         return rsp.status_code == 200
 
     # ---------------- 主对话函数 ----------------
-    def conversation_with_tool(self, messages=None) -> str:
+    def conversation_with_tool(self, messages=None,tool=False) -> str:
         if messages:
             self.history.append({"role": "user", "content": messages})
         payload = {
@@ -116,11 +116,12 @@ class Agent(ABC):
                 self.out(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
                       f"生成 {usage['completion_tokens']} tokens，"
                       f"总计 {usage['total_tokens']} tokens。")
+        logger.info(full_content)
 
         # 1. 去掉工具块后再存历史，防止循环触发
         xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
-        clean_for_history = xml_pattern.sub('', full_content).strip()
-        self.history.append({"role": "assistant", "content": clean_for_history})
+        # clean_for_history = xml_pattern.sub('', full_content).strip()
+        # self.history.append({"role": "assistant", "content": clean_for_history})
 
         # 2. 提取并执行工具
         clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
@@ -135,29 +136,48 @@ class Agent(ABC):
                 raise ValueError("空 XML")
             tool_name = root.name
 
-            # 检查工具权限
-            if not tool_registry.check_permission(self.uuid, tool_name):
-                # 检查是否有类似工具可以推荐
-                available_tools = self._get_available_tools_for_agent()
-                similar_tools = self._find_similar_tools(tool_name, available_tools)
+            # 优先级查找工具：1. 工具注册器 2. 类方法 3. 返回无工具
+            tool_func = None
+            tool_source = None
 
-                permission_error = f"权限错误：Dumplings '{self.uuid}' 没有权限使用工具 '{tool_name}'。"
-                if similar_tools:
-                    permission_error += f" 你可以使用以下类似的工具：{', '.join(similar_tools)}"
-                else:
-                    permission_error += f" 你有权限使用的工具包括：{', '.join(available_tools)}"
+            # 优先级1: 在工具注册器中查找
+            if tool_registry.check_permission(self.uuid, tool_name):
+                tool_info = tool_registry.get_tool_info(tool_name)
+                if tool_info is not None:
+                    tool_func = tool_info['function']
+                    tool_source = "工具注册器"
 
-                self.history.append({"role": "system", "content": permission_error})
-                tool_results.append({"error": permission_error})
+            # 优先级2: 在类方法中查找
+            if tool_func is None and hasattr(self, tool_name):
+                method = getattr(self, tool_name)
+                if callable(method):
+                    tool_func = method
+                    tool_source = "类方法"
+
+            # 优先级3: 都没有找到
+            if tool_func is None:
+                available_tools = self._get_all_available_tools()
+                tool_error = f"工具错误：找不到工具 '{tool_name}'。"
+                if available_tools:
+                    tool_error += f" 你可以使用以下工具：{', '.join(available_tools)}"
+
+                self.history.append({"role": "system", "content": tool_error})
+                tool_results.append({"error": tool_error})
+                logger.warning(f"工具 {tool_name} 未找到，可用工具: {available_tools}")
                 continue
 
-            tool_info = tool_registry.get_tool_info(tool_name)
-            if tool_info is None:
-                raise AttributeError(f"工具 {tool_name} 未注册")
+            logger.info(f"从 {tool_source} 找到工具 {tool_name}")
 
-            func = tool_info['function']
-            result = func(block)
-            tool_results.append(result)
+            # 执行工具
+            try:
+                result = tool_func(block)
+                tool_results.append(result)
+            except Exception as e:
+                error_msg = f"执行工具 {tool_name} 时出错: {str(e)}"
+                self.history.append({"role": "system", "content": error_msg})
+                tool_results.append({"error": error_msg})
+                logger.error(f"工具执行错误: {error_msg}")
+
         #如配置错误强制跳出避免堵塞
         if "<attempt_completion>" in full_content:
             self.out("\n[系统] AI 已标记任务完成，程序退出。")
@@ -166,7 +186,15 @@ class Agent(ABC):
         # 3. 若工具产生结果，继续对话
         if tool_results:
             logger.info("成功执行" + str(tool_results))
-            return self.conversation_with_tool()
+            self.history.append({"role": "system", "content": tool_results})
+            logger.info("history:"+str(self.history))
+            return self.conversation_with_tool(tool=True)
+        if tool:
+            logger.info({
+                "role":self.uuid,
+                "content": self.history[-1:],
+            })
+            return self.history[-1:]
         return full_content
 
     def _get_available_tools_for_agent(self) -> list[str]:
@@ -199,10 +227,10 @@ class Agent(ABC):
         agent_id_tag = soup.find("agent_id")
         message_tag = soup.find("message")
         if agent_id_tag is None:
-            self.history.append({"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"})
+            # self.history.append({"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"})
             return {"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"}
         if message_tag is None:
-            self.history.append({"role": "system", "content": "<ask_for_help> 缺少 message 字段"})
+            # self.history.append({"role": "system", "content": "<ask_for_help> 缺少 message 字段"})
             return {"role": "system", "content": "<ask_for_help> 缺少 message 字段"}
 
         agent_id = agent_id_tag.text.strip()
@@ -213,12 +241,12 @@ class Agent(ABC):
 
             target_cls = agent_list[agent_id]
         except KeyError as e:
-            self.history.append({"role": "system", "content": f"未找到 uuid/别名 {e}"})
+            # self.history.append({"role": "system", "content": f"未找到 uuid/别名 {e}"})
             return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
 
         target_ins = target_cls
         reply = target_ins.conversation_with_tool(message)
-        self.history.append({"role": "assistant", "content": reply})
+        # self.history.append({"role": "assistant", "content": reply})
         return reply
 
     def attempt_completion(self, xml_block: str):
