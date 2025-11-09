@@ -128,6 +128,7 @@ class Agent(ABC):
         clean_content = clean_pattern.sub('', full_content)
         xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
         tool_results = []
+        tool_names = []
         for block in xml_blocks:
             logger.info("\n发现工具块:" + str(block))
             soup = BeautifulSoup(block, "xml")
@@ -172,6 +173,7 @@ class Agent(ABC):
             try:
                 result = tool_func(block)
                 tool_results.append(result)
+                tool_names.append(tool_name)
             except Exception as e:
                 error_msg = f"执行工具 {tool_name} 时出错: {str(e)}"
                 self.history.append({"role": "system", "content": error_msg})
@@ -186,15 +188,15 @@ class Agent(ABC):
         # 3. 若工具产生结果，继续对话
         if tool_results:
             logger.info("成功执行" + str(tool_results))
-            self.history.append({"role": "system", "content": tool_results})
+            for i in tool_results:
+                self.history.append({"role": "system", "content": f"{tool_names[tool_results.index(i)]} results: {i}"})
             logger.info("history:"+str(self.history))
             return self.conversation_with_tool(tool=True)
         if tool:
             logger.info({
-                "role":self.uuid,
-                "content": self.history[-1:],
+                self.history,
             })
-            return self.history[-1:]
+            return self.history[-2:]
         return full_content
 
     def _get_available_tools_for_agent(self) -> list[str]:

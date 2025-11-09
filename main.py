@@ -16,7 +16,7 @@ except:
 load_dotenv()
 
 @Dumplings.tool_registry.register_tool(allowed_agents=["8841cd45eef54217bc8122cafebe5fd6", "time_agent"], name="get_time")
-def get_time(xml:str):
+def get_time(xml:str) -> str:
     return "11:03"
 
 @Dumplings.register_agent(uuid.uuid4().hex, "scheduling_agent")
