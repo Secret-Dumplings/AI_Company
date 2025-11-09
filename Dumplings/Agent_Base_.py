@@ -7,7 +7,10 @@ import sys
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
 from loguru import logger #配置日志
-from .agent_tool import tool_registry
+try:
+    from .agent_tool import tool_registry
+except:
+    raise ImportError("不可单独执行")
 logger.add("logs/app.log", rotation="500 MB", retention="10 days", compression="zip")
 
 
@@ -76,7 +79,7 @@ class Agent(ABC):
         return rsp.status_code == 200
 
     # ---------------- 主对话函数 ----------------
-    def conversation_with_tool(self, messages=None,tool=False) -> str:
+    def conversation_with_tool(self, messages=None,tool=False):
         if messages:
             self.history.append({"role": "user", "content": messages})
         payload = {
@@ -170,15 +173,16 @@ class Agent(ABC):
             logger.info(f"从 {tool_source} 找到工具 {tool_name}")
 
             # 执行工具
-            try:
-                result = tool_func(block)
-                tool_results.append(result)
-                tool_names.append(tool_name)
-            except Exception as e:
-                error_msg = f"执行工具 {tool_name} 时出错: {str(e)}"
-                self.history.append({"role": "system", "content": error_msg})
-                tool_results.append({"error": error_msg})
-                logger.error(f"工具执行错误: {error_msg}")
+            # try:
+            #获得报错回溯
+            result = tool_func(block)
+            tool_results.append(result)
+            tool_names.append(tool_name)
+            # except Exception as e:
+            #     error_msg = f"执行工具 {tool_name} 时出错: {str(e)}"
+            #     self.history.append({"role": "system", "content": error_msg})
+            #     tool_results.append({"error": error_msg})
+            #     logger.error(f"工具执行错误: {error_msg}")
 
         #如配置错误强制跳出避免堵塞
         if "<attempt_completion>" in full_content:
@@ -188,15 +192,20 @@ class Agent(ABC):
         # 3. 若工具产生结果，继续对话
         if tool_results:
             logger.info("成功执行" + str(tool_results))
+            n = 0
             for i in tool_results:
-                self.history.append({"role": "system", "content": f"{tool_names[tool_results.index(i)]} results: {i}"})
+                try:
+                    self.history.append({"role": "system", "content": f"{tool_names[n]} results: {i}"})
+                    n+=1
+                except:
+                    break
             logger.info("history:"+str(self.history))
             return self.conversation_with_tool(tool=True)
         if tool:
-            logger.info({
-                self.history,
-            })
-            return self.history[-2:]
+            logger.info(
+                str(self.history)
+            )
+            return self.history[-1]
         return full_content
 
     def _get_available_tools_for_agent(self) -> list[str]:
@@ -260,6 +269,6 @@ class Agent(ABC):
         if report_content_tag is None:
             sys.exit(0)
 
-        print(report_content_tag.strip())
+        print(report_content_tag)
         sys.exit(0)
 
