@@ -38,7 +38,8 @@ class time_agent(Dumplings.BaseAgent):
         super().__init__()
 
 
-schedule_agent = Dumplings.agent_list["scheduling_agent"]
-# schedule_agent.conversation_with_tool("你好")
-schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
+if __name__ == "__main__":
+    schedule_agent = Dumplings.agent_list["scheduling_agent"]
+    # schedule_agent.conversation_with_tool("你好")
+    schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
 
