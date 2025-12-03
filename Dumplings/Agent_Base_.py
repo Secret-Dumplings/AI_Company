@@ -39,6 +39,7 @@ class Agent(ABC):
     # ---------------- 通用构造 ----------------
     def __init__(self):
         self.uuid=self.__class__.uuid
+        self.name=self.__class__.name
         self.stream_run=False
         from .agent_tool import tool_registry
         agent_name = getattr(self.__class__, 'name', None) or getattr(self.__class__, '__name__', None)

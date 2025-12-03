@@ -8,6 +8,7 @@ def register_agent(uuid, name):
     """
     def _decorator(cls):
         cls.uuid = uuid
+        cls.name = name
         cls = cls()
         agent_list[uuid] = cls
         agent_list[name] = cls
