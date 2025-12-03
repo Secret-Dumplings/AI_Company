@@ -39,6 +39,7 @@ class Agent(ABC):
     # ---------------- 通用构造 ----------------
     def __init__(self):
         self.uuid=self.__class__.uuid
+        self.stream_run=False
         from .agent_tool import tool_registry
         agent_name = getattr(self.__class__, 'name', None) or getattr(self.__class__, '__name__', None)
         if agent_name and self.uuid:
@@ -99,6 +100,7 @@ class Agent(ABC):
         rsp.encoding = 'utf-8'
 
         full_content = ""
+        self.stream_run = True
         for line in rsp.iter_lines(decode_unicode=True):
             if not line or not line.startswith('data: '):
                 continue
@@ -116,6 +118,7 @@ class Agent(ABC):
                 self.out(content)
             usage = chunk.get('usage')
             if usage:
+                self.stream_run = False
                 self.out(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
                       f"生成 {usage['completion_tokens']} tokens，"
                       f"总计 {usage['total_tokens']} tokens。")
@@ -226,7 +229,10 @@ class Agent(ABC):
         return similar_tools[:3]  # 最多返回3个相似工具
 
     def out(self, content: str):
-        print(content, end='', flush=True)
+        if self.stream_run:
+            print(content, end='', flush=True)
+        else:
+            print("\ndone")
 
     def ask_for_help(self, xml_block: str):
         """
