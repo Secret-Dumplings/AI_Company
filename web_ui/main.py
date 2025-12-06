@@ -26,86 +26,57 @@ def get_tool_name(xml: str):
     else:
         return None
 
-
 class agent(Dumplings.BaseAgent):
     def __init__(self):
         super().__init__()
 
-    def out(self, content: str = None):
-        if content is None:
-            # 初始化消息时调用
-            if self.uuid == "1":
-                st.session_state.agent1_messages.append({
-                    "role": "ai",
-                    "content": "",
-                    "timestamp": datetime.now()
-                })
-            elif self.uuid == "2":
-                st.session_state.agent2_messages.append({
-                    "role": "ai",
-                    "content": "",
-                    "timestamp": datetime.now()
-                })
-            st.rerun()
-            return
-
+    def out(self,content:str=None):
         tool_name = get_tool_name(content)
-
-        if self.uuid == "1":
-            if self.stream_run:
+        if self.uuid=="1":
+            if self.stream_run==True:
                 if tool_name is None:
-                    # 追加文本内容到最后一条消息
-                    if st.session_state.agent1_messages and st.session_state.agent1_messages[-1]["role"] == "ai":
-                        st.session_state.agent1_messages[-1]["content"] += content
-                        st.session_state.agent1_messages[-1]["timestamp"] = datetime.now()
-                    else:
-                        st.session_state.agent1_messages.append({
-                            "role": "ai",
-                            "content": content,
-                            "timestamp": datetime.now()
-                        })
+                    st.session_state.agent1_messages[-1]=({
+                        "role": "ai",
+                        "content": st.session_state.agent1_messages[-1].get("content")+content,
+                        "timestamp": datetime.now()
+                    })
                 else:
-                    # 添加工具调用消息
+                    st.session_state.agent1_messages[-1]=({
+                        "role": "tool",
+                        "content": "调用工具："+tool_name,
+                        "timestamp": datetime.now()
+                    })
+            elif self.stream_run==False:
+                if content==None:
                     st.session_state.agent1_messages.append({
-                        "role": "tool",
-                        "content": f"调用工具：{tool_name}",
-                        "timestamp": datetime.now()
+                        "role": "ai",
+                        "content": "",
+                        "timestamp": ""
                     })
-            else:
-                # 非流式模式 - 更新最后一条消息
-                if st.session_state.agent1_messages and st.session_state.agent1_messages[-1]["role"] == "ai":
-                    st.session_state.agent1_messages[-1]["content"] += content
-                    st.session_state.agent1_messages[-1]["timestamp"] = datetime.now()
+                st.rerun()
 
-        elif self.uuid == "2":
-            if self.stream_run:
+        if self.uuid=="2":
+            if self.stream_run==True:
                 if tool_name is None:
-                    # 追加文本内容到最后一条消息
-                    if st.session_state.agent2_messages and st.session_state.agent2_messages[-1]["role"] == "ai":
-                        st.session_state.agent2_messages[-1]["content"] += content
-                        st.session_state.agent2_messages[-1]["timestamp"] = datetime.now()
-                    else:
-                        st.session_state.agent2_messages.append({
-                            "role": "ai",
-                            "content": content,
-                            "timestamp": datetime.now()
-                        })
-                else:
-                    # 添加工具调用消息
-                    st.session_state.agent2_messages.append({
-                        "role": "tool",
-                        "content": f"调用工具：{tool_name}",
+                    st.session_state.agent2_messages[-1]=({
+                        "role": "ai",
+                        "content": st.session_state.agent2_messages[-1].get("content")+content,
                         "timestamp": datetime.now()
                     })
-            else:
-                # 非流式模式 - 更新最后一条消息
-                if st.session_state.agent2_messages and st.session_state.agent2_messages[-1]["role"] == "ai":
-                    st.session_state.agent2_messages[-1]["content"] += content
-                    st.session_state.agent2_messages[-1]["timestamp"] = datetime.now()
-
-        # 只在流式模式下或内容变化时刷新
-        if self.stream_run or content:
-            st.rerun()
+                else:
+                    st.session_state.agent2_messages[-1]=({
+                        "role": "tool",
+                        "content": "调用工具："+tool_name,
+                        "timestamp": datetime.now()
+                    })
+            elif self.stream_run==False:
+                if content==None:
+                    st.session_state.agent2_messages.append({
+                        "role": "ai",
+                        "content": "",
+                        "timestamp": ""
+                    })
+                st.rerun()
 
 
 @Dumplings.tool_registry.register_tool(allowed_agents=["8841cd45eef54217bc8122cafebe5fd6", "time_agent"], name="get_time")
