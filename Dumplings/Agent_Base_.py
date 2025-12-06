@@ -120,6 +120,7 @@ class Agent(ABC):
             usage = chunk.get('usage')
             if usage:
                 self.stream_run = False
+                self.out(None)
                 self.out(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
                       f"生成 {usage['completion_tokens']} tokens，"
                       f"总计 {usage['total_tokens']} tokens。")

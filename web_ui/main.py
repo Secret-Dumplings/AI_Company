@@ -10,25 +10,110 @@ load_dotenv()
 
 
 # ====Agent====
+def get_tool_name(xml: str):
+    xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
+    clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
+    clean_content = clean_pattern.sub('', xml)
+    xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
+    if xml_blocks:
+        for block in xml_blocks:
+            soup = BeautifulSoup(block, "xml")
+            root = soup.find()
+            if root is None:
+                return None
+            tool_name = root.name
+            return tool_name
+    else:
+        return None
+
+
 class agent(Dumplings.BaseAgent):
     def __init__(self):
         super().__init__()
 
-    def out(self,content:str)->str:
-        st.session_state.agent2_messages.append({
-            "role": "tool",
-            "content": "调用工具：get_time",
-            "timestamp": datetime.now()
-        })
-        st.session_state.current_agent = "time_agent_result"
+    def out(self, content: str = None):
+        if content is None:
+            # 初始化消息时调用
+            if self.uuid == "1":
+                st.session_state.agent1_messages.append({
+                    "role": "ai",
+                    "content": "",
+                    "timestamp": datetime.now()
+                })
+            elif self.uuid == "2":
+                st.session_state.agent2_messages.append({
+                    "role": "ai",
+                    "content": "",
+                    "timestamp": datetime.now()
+                })
+            st.rerun()
+            return
+
+        tool_name = get_tool_name(content)
+
+        if self.uuid == "1":
+            if self.stream_run:
+                if tool_name is None:
+                    # 追加文本内容到最后一条消息
+                    if st.session_state.agent1_messages and st.session_state.agent1_messages[-1]["role"] == "ai":
+                        st.session_state.agent1_messages[-1]["content"] += content
+                        st.session_state.agent1_messages[-1]["timestamp"] = datetime.now()
+                    else:
+                        st.session_state.agent1_messages.append({
+                            "role": "ai",
+                            "content": content,
+                            "timestamp": datetime.now()
+                        })
+                else:
+                    # 添加工具调用消息
+                    st.session_state.agent1_messages.append({
+                        "role": "tool",
+                        "content": f"调用工具：{tool_name}",
+                        "timestamp": datetime.now()
+                    })
+            else:
+                # 非流式模式 - 更新最后一条消息
+                if st.session_state.agent1_messages and st.session_state.agent1_messages[-1]["role"] == "ai":
+                    st.session_state.agent1_messages[-1]["content"] += content
+                    st.session_state.agent1_messages[-1]["timestamp"] = datetime.now()
+
+        elif self.uuid == "2":
+            if self.stream_run:
+                if tool_name is None:
+                    # 追加文本内容到最后一条消息
+                    if st.session_state.agent2_messages and st.session_state.agent2_messages[-1]["role"] == "ai":
+                        st.session_state.agent2_messages[-1]["content"] += content
+                        st.session_state.agent2_messages[-1]["timestamp"] = datetime.now()
+                    else:
+                        st.session_state.agent2_messages.append({
+                            "role": "ai",
+                            "content": content,
+                            "timestamp": datetime.now()
+                        })
+                else:
+                    # 添加工具调用消息
+                    st.session_state.agent2_messages.append({
+                        "role": "tool",
+                        "content": f"调用工具：{tool_name}",
+                        "timestamp": datetime.now()
+                    })
+            else:
+                # 非流式模式 - 更新最后一条消息
+                if st.session_state.agent2_messages and st.session_state.agent2_messages[-1]["role"] == "ai":
+                    st.session_state.agent2_messages[-1]["content"] += content
+                    st.session_state.agent2_messages[-1]["timestamp"] = datetime.now()
+
+        # 只在流式模式下或内容变化时刷新
+        if self.stream_run or content:
+            st.rerun()
 
 
 @Dumplings.tool_registry.register_tool(allowed_agents=["8841cd45eef54217bc8122cafebe5fd6", "time_agent"], name="get_time")
 def get_time(xml:str) -> str:
     return "11:03"
 
-@Dumplings.register_agent("main", "scheduling_agent")
-class scheduling_agent(Dumplings.BaseAgent):
+@Dumplings.register_agent("1", "scheduling_agent")
+class scheduling_agent(agent):
     prompt = f"你是一个名为汤圆Agent的AGI，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签退出对话， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     model_name = "deepseek-v3.2-exp"
@@ -36,8 +121,8 @@ class scheduling_agent(Dumplings.BaseAgent):
     def __init__(self):
         super().__init__()
 
-@Dumplings.register_agent("8841cd45eef54217bc8122cafebe5fd6", "time_agent")
-class time_agent(Dumplings.BaseAgent):
+@Dumplings.register_agent("2", "time_agent")
+class time_agent(agent):
     prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你还有get_time可以查询时间（直接<get_time></get_time>即可）"
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     model_name = "deepseek-v3.2-exp"
@@ -587,6 +672,16 @@ def init_session_state():
             "content": "您好！我是调度Agent。我可以处理您的问题，并在需要时召唤时间Agent提供专业支持。",
             "timestamp": datetime.now()
         })
+        st.session_state.agent1_messages.append({
+            "role": "ai",
+            "content": "",
+            "timestamp": ""
+        })
+        st.session_state.agent2_messages.append({
+            "role": "ai",
+            "content": "",
+            "timestamp": ""
+        })
 
 
 init_session_state()
@@ -844,22 +939,14 @@ if send_button and user_input.strip() and not st.session_state.is_processing:
     # 模拟 Agent 对话流程
     st.rerun()
 
-def get_tool_name(xml: str) -> str:
-    xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
-    clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
-    clean_content = clean_pattern.sub('', xml)
-    xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
-    for block in xml_blocks:
-        soup = BeautifulSoup(block, "xml")
-        root = soup.find()
-        if root is None:
-            raise ValueError("空 XML")
-        tool_name = root.name
-        return tool_name
+
 
 # 模拟 Agent 对话流程
 if st.session_state.is_processing:
-    pass
+    schedule_agent = Dumplings.agent_list["1"]
+    schedule_agent.conversation_with_tool("你现在有一个id为2的同伴，请求它帮你查看现在时间")
+
+
 
 # 替换原来的状态栏代码
 st.html(f"""
