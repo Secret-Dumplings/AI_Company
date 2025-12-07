@@ -1,16 +1,17 @@
 import streamlit as st
 import time
 from datetime import datetime
+from typing import Generator
 
 # 页面配置
 st.set_page_config(
-    page_title="AI协作对话系统",
+    page_title="AI协作对话系统 - 流式输出",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 自定义CSS - 类似上面HTML的简洁样式
+# 自定义CSS - 优化流式输出样式（保持不变）
 st.html("""
 <style>
     * {
@@ -282,7 +283,22 @@ st.html("""
         animation-delay: -0.16s;
     }
 
-    /* 增强动画效果 */
+    .streaming-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1.2em;
+        background-color: #007bff;
+        margin-left: 2px;
+        animation: blink 1s infinite;
+        vertical-align: text-bottom;
+    }
+
+    .streaming-message {
+        position: relative;
+        border-left: 4px solid #007bff !important;
+        border-right: none !important;
+    }
+
     @keyframes messageAppear {
         from { 
             opacity: 0; 
@@ -305,24 +321,16 @@ st.html("""
         }
     }
 
-    @keyframes fadeIn {
-        from { 
-            opacity: 0; 
-            transform: translateY(5px); 
-        }
-        to { 
-            opacity: 1; 
-            transform: translateY(0); 
-        }
+    @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
     }
 
-    /* 隐藏Streamlit默认元素 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stDeployButton {display: none;}
 
-    /* 优化滚动条 */
     .ai-conversation::-webkit-scrollbar {
         width: 8px;
     }
@@ -341,7 +349,6 @@ st.html("""
         background: linear-gradient(180deg, #0056b3 0%, #003d82 100%);
     }
 
-    /* 响应式设计改进 */
     @media (max-width: 768px) {
         .dual-conversation {
             flex-direction: column;
@@ -362,173 +369,23 @@ st.html("""
             font-size: 1.8rem;
         }
     }
-
-    @media (max-width: 480px) {
-        .container {
-            margin: 0;
-            border-radius: 0;
-            border: none;
-            box-shadow: none;
-        }
-
-        .conversation-section,
-        .input-section {
-            padding: 15px 12px;
-        }
-    }
-
-    /* 增强对比度的辅助类 */
-    .high-contrast {
-        --text-primary: #000000 !important;
-        --text-secondary: #1a1a1a !important;
-        --bg-primary: #ffffff !important;
-        --bg-secondary: #f8f9fa !important;
-    }
-
-    /* 改进字体可读性 */
-    .message, .ai-name, .typing-indicator, .collaboration-indicator {
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: optimizeLegibility;
-    }
-
-    /* 添加微妙的背景图案增强深度感 */
-    .ai-box::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: 
-            radial-gradient(circle at 20% 80%, rgba(0, 123, 255, 0.03) 0%, transparent 50%),
-            radial-gradient(circle at 80% 20%, rgba(108, 117, 125, 0.02) 0%, transparent 50%);
-        pointer-events: none;
-        z-index: 1;
-    }
-
-    /* 确保内容在背景之上 */
-    .ai-header, .ai-conversation {
-        position: relative;
-        z-index: 2;
-    }
-
-    /* 打印样式优化 */
-    @media print {
-        .container {
-            border: none;
-            box-shadow: none;
-        }
-
-        .ai-box {
-            height: auto;
-            page-break-inside: avoid;
-        }
-
-        .message {
-            background: #ffffff !important;
-            color: #000000 !important;
-            box-shadow: none !important;
-            border: 1px solid #ddd !important;
-        }
-    }
-
-    /* =========================================== */
-    /* 状态栏样式 - 改为黑色 */
-    /* =========================================== */
-
-    /* 状态栏容器 */
-    .st-emotion-cache-1qg05tj.e1f1d6gn1 {
-        background-color: #1a1a1a !important;
-        color: #ffffff !important;
-        padding: 12px 20px !important;
-        margin-top: 20px !important;
-        border-radius: 8px !important;
-        border: 2px solid #000000 !important;
-    }
-
-    /* 状态栏分隔线 */
-    hr {
-        border: none !important;
-        height: 2px !important;
-        background: linear-gradient(90deg, #1a1a1a, #007bff, #1a1a1a) !important;
-        margin: 20px 0 !important;
-        opacity: 0.8 !important;
-    }
-
-    /* 状态栏文本 */
-    .st-caption {
-        color: #ffffff !important;
-        font-weight: 500 !important;
-        font-size: 0.95rem !important;
-        padding: 6px 12px !important;
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border-radius: 6px !important;
-        border-left: 3px solid #007bff !important;
-        margin: 2px 0 !important;
-        transition: all 0.3s ease !important;
-    }
-
-    .st-caption:hover {
-        background-color: rgba(255, 255, 255, 0.15) !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.2) !important;
-    }
-
-    /* 状态栏列 */
-    .st-emotion-cache-keje6w.e1f1d6gn2 {
-        background-color: #2c2c2c !important;
-        border-radius: 8px !important;
-        padding: 8px !important;
-        margin: 4px !important;
-        border: 1px solid #404040 !important;
-    }
-
-    /* 状态文本特定样式 */
-    .st-caption:contains("🟢"),
-    .st-caption:contains("🟡") {
-        background: linear-gradient(135deg, rgba(0, 123, 255, 0.2), rgba(0, 123, 255, 0.1)) !important;
-        border-left: 3px solid #28a745 !important;
-    }
-
-    .st-caption:contains("📊") {
-        background: linear-gradient(135deg, rgba(108, 117, 125, 0.2), rgba(108, 117, 125, 0.1)) !important;
-        border-left: 3px solid #6c757d !important;
-    }
-
-    /* 状态栏状态颜色 */
-    .st-caption:contains("🟢") {
-        color: #28a745 !important;
-        font-weight: 600 !important;
-    }
-
-    .st-caption:contains("🟡") {
-        color: #ffc107 !important;
-        font-weight: 600 !important;
-    }
-
-    /* 确保状态栏在移动端也有良好显示 */
-    @media (max-width: 768px) {
-        .st-emotion-cache-1qg05tj.e1f1d6gn1 {
-            padding: 10px 15px !important;
-            margin: 15px 10px !important;
-        }
-
-        .st-caption {
-            font-size: 0.85rem !important;
-            padding: 5px 8px !important;
-        }
-    }
-
-    /* 确保状态栏文字与背景的高对比度 */
-    .st-caption {
-        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
-    }
 </style>
 """)
 
 
+# ===========================================
+# 流式输出生成器函数
+# ===========================================
+def stream_text_generator(text: str, delay_per_char: float = 0.03) -> Generator[str, None, None]:
+    """模拟API流式响应，逐个字符生成文本"""
+    for char in text:
+        yield char
+        time.sleep(delay_per_char)
+
+
+# ===========================================
 # 初始化会话状态
+# ===========================================
 def init_session_state():
     if 'initialized' not in st.session_state:
         st.session_state.initialized = True
@@ -536,36 +393,73 @@ def init_session_state():
         st.session_state.agent2_messages = []
         st.session_state.is_processing = False
         st.session_state.current_agent = None
-        st.session_state.show_dual = False  # 初始不显示双列
+        st.session_state.show_dual = False
+
+        # 流式输出相关状态
+        st.session_state.streaming_active = False
+        st.session_state.streaming_agent = None
+        st.session_state.streaming_message_index = None
+        st.session_state.streaming_content = ""
+        st.session_state.streaming_generator = None
+
+        # 用户输入存储
+        st.session_state.user_input_buffer = ""
+
+        # 新增：清空输入框标志
+        st.session_state.should_clear_input = False
+
         # 添加初始消息
         st.session_state.agent1_messages.append({
             "role": "ai",
             "content": "您好！我是调度Agent。我可以处理您的问题，并在需要时召唤时间Agent提供专业支持。",
-            "timestamp": datetime.now()
+            "timestamp": datetime.now(),
+            "is_streaming": False
         })
 
 
 init_session_state()
 
+
+# ===========================================
+# 核心修复：前置状态检查与清理
+# ===========================================
+def check_and_clear_widgets():
+    """
+    此函数必须在任何输入小部件被渲染前调用。
+    检查session_state中的标志，并在需要时安全地清空小部件的值。
+    """
+    # 检查是否需要清空主输入框
+    if st.session_state.get('should_clear_input', False):
+        # 此时user_input_widget还未被当前脚本执行周期实例化，可以安全修改
+        if 'user_input_widget' in st.session_state:
+            st.session_state.user_input_widget = ""
+        st.session_state.should_clear_input = False
+
+
+# 调用清空检查函数（在渲染任何小部件之前）
+check_and_clear_widgets()
+
+# ===========================================
 # 页面结构
+# ===========================================
 st.html("""
 <div class="container">
     <div class="header">
         <h1>🤖 AI协作对话系统</h1>
-        <p>调度Agent与时间Agent的协作对话</p>
+        <p>实时流式输出演示 - 单个字符级别</p>
     </div>
 """)
 
-# 使用一个空的占位符来确保每次更新都会重新渲染对话
+# 对话显示占位符
 conversation_placeholder = st.empty()
 
 
-# 构建完整的对话HTML内容
+# 构建对话HTML
 def build_conversation_html():
     html = '<div class="conversation-section">'
 
     if not st.session_state.show_dual:
-        # 单列模式 - 只显示调度Agent
+        # 单列模式
         html += '''
         <div class="single-conversation">
             <div class="ai-box">
@@ -576,8 +470,7 @@ def build_conversation_html():
                 <div class="ai-conversation">
         '''
 
-        # 调度Agent的消息
-        for msg in st.session_state.agent1_messages:
+        for idx, msg in enumerate(st.session_state.agent1_messages):
             if msg["role"] == "user":
                 html += f'''
                 <div class="message user-message">
@@ -585,9 +478,17 @@ def build_conversation_html():
                 </div>
                 '''
             elif msg["role"] == "ai":
+                is_streaming = msg.get("is_streaming", False)
+                message_class = "message ai-message"
+                if is_streaming:
+                    message_class += " streaming-message"
+
                 html += f'''
-                <div class="message ai-message">
-                    <div class="message-text">{msg["content"]}</div>
+                <div class="{message_class}">
+                    <div class="message-text">
+                        {msg["content"]}
+                        {'''<span class="streaming-cursor"></span>''' if is_streaming else ''}
+                    </div>
                 </div>
                 '''
             elif msg["role"] == "system":
@@ -603,8 +504,9 @@ def build_conversation_html():
                 </div>
                 '''
 
-        # 打字指示器
-        if st.session_state.is_processing and st.session_state.current_agent == "scheduling_agent":
+        if (st.session_state.is_processing and
+                st.session_state.current_agent == "scheduling_agent" and
+                not st.session_state.streaming_active):
             html += '''
             <div class="typing-indicator">
                 <div class="ai-avatar" style="width:25px;height:25px;font-size:0.8rem;">AI1</div>
@@ -616,15 +518,7 @@ def build_conversation_html():
             </div>
             '''
 
-        html += '</div></div></div>'  # 关闭ai-conversation, ai-box和single-conversation
-
-        # 协作指示器
-        if st.session_state.is_processing and st.session_state.current_agent == "calling_ai2":
-            html += '''
-            <div class="collaboration-indicator">
-                调度Agent正在召唤时间Agent参与讨论...
-            </div>
-            '''
+        html += '</div></div></div>'
     else:
         # 双列模式
         html += '<div class="dual-conversation">'
@@ -639,8 +533,7 @@ def build_conversation_html():
             <div class="ai-conversation">
         '''
 
-        # 调度Agent的消息
-        for msg in st.session_state.agent1_messages:
+        for idx, msg in enumerate(st.session_state.agent1_messages):
             if msg["role"] == "user":
                 html += f'''
                 <div class="message user-message">
@@ -648,9 +541,17 @@ def build_conversation_html():
                 </div>
                 '''
             elif msg["role"] == "ai":
+                is_streaming = msg.get("is_streaming", False) and st.session_state.streaming_agent == "agent1"
+                message_class = "message ai-message"
+                if is_streaming:
+                    message_class += " streaming-message"
+
                 html += f'''
-                <div class="message ai-message">
-                    <div class="message-text">{msg["content"]}</div>
+                <div class="{message_class}">
+                    <div class="message-text">
+                        {msg["content"]}
+                        {'''<span class="streaming-cursor"></span>''' if is_streaming else ''}
+                    </div>
                 </div>
                 '''
             elif msg["role"] == "system":
@@ -666,20 +567,7 @@ def build_conversation_html():
                 </div>
                 '''
 
-        # 打字指示器
-        if st.session_state.is_processing and st.session_state.current_agent == "scheduling_agent":
-            html += '''
-            <div class="typing-indicator">
-                <div class="ai-avatar" style="width:25px;height:25px;font-size:0.8rem;">AI1</div>
-                <div class="typing-dots">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-            </div>
-            '''
-
-        html += '</div></div>'  # 关闭ai-conversation和ai-box
+        html += '</div></div>'  # 关闭左侧
 
         # 右侧列 - 时间Agent
         html += '''
@@ -691,12 +579,19 @@ def build_conversation_html():
             <div class="ai-conversation">
         '''
 
-        # 时间Agent的消息
-        for msg in st.session_state.agent2_messages:
+        for idx, msg in enumerate(st.session_state.agent2_messages):
             if msg["role"] == "ai":
+                is_streaming = msg.get("is_streaming", False) and st.session_state.streaming_agent == "agent2"
+                message_class = "message ai-message"
+                if is_streaming:
+                    message_class += " streaming-message"
+
                 html += f'''
-                <div class="message ai-message">
-                    <div class="message-text">{msg["content"]}</div>
+                <div class="{message_class}">
+                    <div class="message-text">
+                        {msg["content"]}
+                        {'''<span class="streaming-cursor"></span>''' if is_streaming else ''}
+                    </div>
                 </div>
                 '''
             elif msg["role"] == "system":
@@ -712,41 +607,29 @@ def build_conversation_html():
                 </div>
                 '''
 
-        # 打字指示器
-        if st.session_state.is_processing and st.session_state.current_agent in ["time_agent_thinking",
-                                                                                 "time_agent_result"]:
-            html += '''
-            <div class="typing-indicator">
-                <div class="ai-avatar" style="width:25px;height:25px;font-size:0.8rem;">AI2</div>
-                <div class="typing-dots">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-            </div>
-            '''
+        html += '</div></div></div>'  # 关闭右侧和双列模式
 
-        html += '</div></div></div>'  # 关闭ai-conversation, ai-box和dual-conversation
-
-    html += '</div>'  # 关闭conversation-section
+    html += '</div>'
     return html
 
 
-# 使用占位符显示对话内容，每次都会完全重新渲染
+# 显示对话
 conversation_placeholder.html(build_conversation_html())
 
+# ===========================================
 # 输入区域
+# ===========================================
 st.html('<div class="input-section">')
 st.html('<div class="user-input-box">')
 
-# 修复：给text_area一个有效的label参数
+# 渲染输入框（此时已通过前置检查安全清空）
 user_input = st.text_area(
-    "输入指令",  # 添加一个非空标签
+    "输入指令",
     height=100,
-    key="user_input",
-    label_visibility="collapsed",  # 隐藏标签但保留可访问性
-    placeholder="输入您的问题或指令...",
-    disabled=st.session_state.is_processing
+    key="user_input_widget",
+    label_visibility="collapsed",
+    placeholder="输入您的问题或指令...（支持：时间查询、天气信息、问题解答）",
+    disabled=st.session_state.is_processing or st.session_state.streaming_active
 )
 
 st.html('</div>')
@@ -757,174 +640,287 @@ with col_btn1:
     clear_button = st.button(
         "清空对话",
         use_container_width=True,
-        disabled=st.session_state.is_processing
+        disabled=st.session_state.is_processing or st.session_state.streaming_active
     )
 with col_btn3:
     send_button = st.button(
         "发送消息" if not st.session_state.is_processing else "处理中...",
         type="primary",
         use_container_width=True,
-        disabled=st.session_state.is_processing
+        disabled=st.session_state.is_processing or st.session_state.streaming_active
     )
 
 st.html('</div>')  # 关闭input-section
-
 st.html('</div>')  # 关闭容器
 
+# ===========================================
+# 按钮事件处理
+# ===========================================
 # 处理清空对话
 if clear_button and not st.session_state.is_processing:
     st.session_state.agent1_messages = [{
         "role": "ai",
         "content": "您好！我是调度Agent。我可以处理您的问题，并在需要时召唤时间Agent提供专业支持。",
-        "timestamp": datetime.now()
+        "timestamp": datetime.now(),
+        "is_streaming": False
     }]
     st.session_state.agent2_messages = []
-    st.session_state.show_dual = False  # 重置为单列模式
+    st.session_state.show_dual = False
     st.session_state.is_processing = False
     st.session_state.current_agent = None
+    st.session_state.streaming_active = False
+    st.session_state.streaming_content = ""
+    st.session_state.streaming_generator = None
+    st.session_state.user_input_buffer = ""
+
+    # 核心修复：设置清空标志，而不是直接修改widget状态
+    st.session_state.should_clear_input = True
+
     st.rerun()
 
-# 处理发送指令
-if send_button and user_input.strip() and not st.session_state.is_processing:
-    # 添加用户消息到调度 Agent
+# 处理发送消息
+if send_button and user_input and not st.session_state.is_processing:
+    # 存储用户输入到缓冲区
+    st.session_state.user_input_buffer = user_input.strip()
+
+    # 添加用户消息
     st.session_state.agent1_messages.append({
         "role": "user",
-        "content": user_input.strip(),
-        "timestamp": datetime.now()
+        "content": st.session_state.user_input_buffer,
+        "timestamp": datetime.now(),
+        "is_streaming": False
     })
 
     # 设置为处理中
     st.session_state.is_processing = True
     st.session_state.current_agent = "scheduling_agent"
 
-    # 模拟 Agent 对话流程
+    # 核心修复：设置清空标志，而不是直接修改widget状态
+    st.session_state.should_clear_input = True
+
     st.rerun()
 
-# 模拟 Agent 对话流程
+
+# ===========================================
+# 流式输出处理函数
+# ===========================================
+def process_streaming_chunk():
+    """处理单个字符的流式输出"""
+    if (st.session_state.streaming_active and
+            st.session_state.streaming_generator is not None):
+        try:
+            char = next(st.session_state.streaming_generator)
+            st.session_state.streaming_content += char
+
+            if st.session_state.streaming_agent == "agent1":
+                if st.session_state.streaming_message_index < len(st.session_state.agent1_messages):
+                    st.session_state.agent1_messages[st.session_state.streaming_message_index]["content"] = \
+                        st.session_state.streaming_content
+                    st.session_state.agent1_messages[st.session_state.streaming_message_index]["is_streaming"] = True
+            elif st.session_state.streaming_agent == "agent2":
+                if st.session_state.streaming_message_index < len(st.session_state.agent2_messages):
+                    st.session_state.agent2_messages[st.session_state.streaming_message_index]["content"] = \
+                        st.session_state.streaming_content
+                    st.session_state.agent2_messages[st.session_state.streaming_message_index]["is_streaming"] = True
+
+            return True
+        except StopIteration:
+            st.session_state.streaming_active = False
+            st.session_state.streaming_generator = None
+
+            if st.session_state.streaming_agent == "agent1":
+                if st.session_state.streaming_message_index < len(st.session_state.agent1_messages):
+                    st.session_state.agent1_messages[st.session_state.streaming_message_index]["is_streaming"] = False
+            elif st.session_state.streaming_agent == "agent2":
+                if st.session_state.streaming_message_index < len(st.session_state.agent2_messages):
+                    st.session_state.agent2_messages[st.session_state.streaming_message_index]["is_streaming"] = False
+
+            return False
+    return False
+
+
+# ===========================================
+# 模拟对话流程
+# ===========================================
 if st.session_state.is_processing:
-    # 根据当前状态模拟对话
     if st.session_state.current_agent == "scheduling_agent":
-        # 第一步：调度 Agent 回复
-        time.sleep(1.5)
-        st.session_state.agent1_messages.append({
-            "role": "ai",
-            "content": "我理解您的问题，让我为您分析一下。",
-            "timestamp": datetime.now()
-        })
-        st.session_state.current_agent = "calling_ai2"
-        st.rerun()
+        if not st.session_state.streaming_active:
+            st.session_state.agent1_messages.append({
+                "role": "ai",
+                "content": "",
+                "timestamp": datetime.now(),
+                "is_streaming": True
+            })
+
+            prompt = st.session_state.user_input_buffer
+            full_response = f"我理解您的需求：'{prompt}'。让我为您分析并准备回答。首先，我需要思考这个问题..."
+
+            st.session_state.streaming_active = True
+            st.session_state.streaming_agent = "agent1"
+            st.session_state.streaming_message_index = len(st.session_state.agent1_messages) - 1
+            st.session_state.streaming_content = ""
+            st.session_state.streaming_generator = stream_text_generator(full_response, delay_per_char=0.02)
+
+        if process_streaming_chunk():
+            st.rerun()
+        else:
+            st.session_state.current_agent = "calling_ai2"
+            st.rerun()
 
     elif st.session_state.current_agent == "calling_ai2":
-        # 调度 Agent 召唤时间Agent
-        time.sleep(1)
-        st.session_state.agent1_messages.append({
-            "role": "ai",
-            "content": "让我召唤时间Agent来提供更专业的意见。",
-            "timestamp": datetime.now()
-        })
+        if not st.session_state.streaming_active:
+            st.session_state.agent1_messages.append({
+                "role": "ai",
+                "content": "",
+                "timestamp": datetime.now(),
+                "is_streaming": True
+            })
 
-        # 切换到双列模式
-        st.session_state.show_dual = True
+            full_response = "这个问题涉及到时间相关的内容，让我召唤时间Agent来提供更专业的意见。正在连接时间Agent..."
 
-        st.session_state.current_agent = "time_agent_thinking"
-        st.rerun()
+            st.session_state.streaming_active = True
+            st.session_state.streaming_agent = "agent1"
+            st.session_state.streaming_message_index = len(st.session_state.agent1_messages) - 1
+            st.session_state.streaming_content = ""
+            st.session_state.streaming_generator = stream_text_generator(full_response, delay_per_char=0.015)
+
+        if process_streaming_chunk():
+            st.rerun()
+        else:
+            st.session_state.show_dual = True
+            st.session_state.current_agent = "time_agent_thinking"
+            st.rerun()
 
     elif st.session_state.current_agent == "time_agent_thinking":
-        # 时间 Agent 开始处理
-        time.sleep(1.5)
-        st.session_state.agent2_messages.append({
-            "role": "ai",
-            "content": "感谢调度Agent的召唤。我正在查询当前时间...",
-            "timestamp": datetime.now()
-        })
-        st.session_state.current_agent = "time_agent_tool"
-        st.rerun()
+        if not st.session_state.streaming_active:
+            st.session_state.agent2_messages.append({
+                "role": "ai",
+                "content": "",
+                "timestamp": datetime.now(),
+                "is_streaming": True
+            })
+
+            full_response = "感谢调度Agent的召唤。我正在查询相关的时间信息..."
+
+            st.session_state.streaming_active = True
+            st.session_state.streaming_agent = "agent2"
+            st.session_state.streaming_message_index = len(st.session_state.agent2_messages) - 1
+            st.session_state.streaming_content = ""
+            st.session_state.streaming_generator = stream_text_generator(full_response, delay_per_char=0.01)
+
+        if process_streaming_chunk():
+            st.rerun()
+        else:
+            st.session_state.current_agent = "time_agent_tool"
+            st.rerun()
 
     elif st.session_state.current_agent == "time_agent_tool":
-        # 时间 Agent 调用工具
-        time.sleep(1)
         st.session_state.agent2_messages.append({
             "role": "tool",
             "content": "调用工具：get_time",
-            "timestamp": datetime.now()
+            "timestamp": datetime.now(),
+            "is_streaming": False
         })
         st.session_state.current_agent = "time_agent_result"
         st.rerun()
 
     elif st.session_state.current_agent == "time_agent_result":
-        # 时间 Agent 返回结果
-        time.sleep(1.5)
-        st.session_state.agent2_messages.append({
-            "role": "ai",
-            "content": "✅ 查询成功！当前时间是：11:03",
-            "timestamp": datetime.now()
-        })
-        st.session_state.current_agent = "scheduling_summary"
-        st.rerun()
+        if not st.session_state.streaming_active:
+            st.session_state.agent2_messages.append({
+                "role": "ai",
+                "content": "",
+                "timestamp": datetime.now(),
+                "is_streaming": True
+            })
+
+            current_time = datetime.now().strftime("%H:%M:%S")
+            full_response = f"✅ 查询成功！当前系统时间是：{current_time}。"
+
+            st.session_state.streaming_active = True
+            st.session_state.streaming_agent = "agent2"
+            st.session_state.streaming_message_index = len(st.session_state.agent2_messages) - 1
+            st.session_state.streaming_content = ""
+            st.session_state.streaming_generator = stream_text_generator(full_response, delay_per_char=0.008)
+
+        if process_streaming_chunk():
+            st.rerun()
+        else:
+            st.session_state.current_agent = "scheduling_summary"
+            st.rerun()
 
     elif st.session_state.current_agent == "scheduling_summary":
-        # 调度 Agent 总结
-        time.sleep(1)
-        st.session_state.agent1_messages.append({
-            "role": "ai",
-            "content": "感谢时间Agent的补充。基于我们的讨论，当前时间是11:03。",
-            "timestamp": datetime.now()
-        })
-        st.session_state.current_agent = "completion"
-        st.rerun()
+        if not st.session_state.streaming_active:
+            st.session_state.agent1_messages.append({
+                "role": "ai",
+                "content": "",
+                "timestamp": datetime.now(),
+                "is_streaming": True
+            })
+
+            current_time = datetime.now().strftime("%H:%M")
+            full_response = f"感谢时间Agent的补充。基于我们的讨论，当前时间是{current_time}。我可以基于这个时间为您安排日程或提供其他时间相关的建议。"
+
+            st.session_state.streaming_active = True
+            st.session_state.streaming_agent = "agent1"
+            st.session_state.streaming_message_index = len(st.session_state.agent1_messages) - 1
+            st.session_state.streaming_content = ""
+            st.session_state.streaming_generator = stream_text_generator(full_response, delay_per_char=0.02)
+
+        if process_streaming_chunk():
+            st.rerun()
+        else:
+            st.session_state.current_agent = "completion"
+            st.rerun()
 
     elif st.session_state.current_agent == "completion":
-        # 调度 Agent 标记任务完成
-        time.sleep(0.5)
         st.session_state.agent1_messages.append({
             "role": "tool",
-            "content": "🏁 标记任务完成",
-            "timestamp": datetime.now()
+            "content": "🏁 任务完成 - 协作对话结束",
+            "timestamp": datetime.now(),
+            "is_streaming": False
         })
-
         st.session_state.is_processing = False
         st.session_state.current_agent = None
         st.rerun()
 
-# 替换原来的状态栏代码
+# ===========================================
+# 状态栏
+# ===========================================
 st.html(f"""
-    <div style="display: flex; justify-content: space-around; color: white; font-weight: bold;">
+    <div style="display: flex; justify-content: space-around; color: white; font-weight: bold; margin-top: 20px; padding: 10px; background: #1a1a1a; border-radius: 8px;">
         <div style="color: #4ade80; padding: 8px 15px; background: rgba(74, 222, 128, 0.15); border-radius: 8px; border: 1px solid #4ade80;">
-            🟢 就绪
+            {'🟢 就绪' if not st.session_state.is_processing else '🟡 处理中'}
         </div>
         <div style="color: #60a5fa; padding: 8px 15px; background: rgba(96, 165, 250, 0.15); border-radius: 8px; border: 1px solid #60a5fa;">
-            📊 调度Agent消息: {len(st.session_state.agent1_messages)}
+            📊 总消息: {len(st.session_state.agent1_messages) + len(st.session_state.agent2_messages)}
         </div>
-        <div style="color: #60a5fa; padding: 8px 15px; background: rgba(96, 165, 250, 0.15); border-radius: 8px; border: 1px solid #60a5fa;">
-            📊 时间Agent消息: {len(st.session_state.agent2_messages)}
+        <div style="color: #f87171; padding: 8px 15px; background: rgba(248, 113, 113, 0.15); border-radius: 8px; border: 1px solid #f87171;">
+            ⚡ 流式状态: {'活跃' if st.session_state.streaming_active else '空闲'}
+        </div>
+        <div style="color: #d946ef; padding: 8px 15px; background: rgba(217, 70, 239, 0.15); border-radius: 8px; border: 1px solid #d946ef;">
+            🎯 当前Agent: {st.session_state.current_agent or '无'}
         </div>
     </div>
 """)
 
-# 添加JavaScript自动滚动到底部
+# ===========================================
+# JavaScript自动滚动
+# ===========================================
 st.html("""
 <script>
-    // 页面加载完成后自动滚动到底部
-    window.onload = function() {
-        // 给所有对话容器添加自动滚动
+    function scrollToBottom() {
         const conversationContainers = document.querySelectorAll('.ai-conversation');
         conversationContainers.forEach(container => {
             container.scrollTop = container.scrollHeight;
         });
-    };
+    }
 
-    // 监听Streamlit的页面更新
+    window.onload = scrollToBottom;
+
     const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            // 当对话内容更新时，滚动到底部
-            const conversationContainers = document.querySelectorAll('.ai-conversation');
-            conversationContainers.forEach(container => {
-                container.scrollTop = container.scrollHeight;
-            });
-        });
+        scrollToBottom();
     });
 
-    // 观察整个文档的变化
     observer.observe(document.body, { childList: true, subtree: true });
 </script>
 """)
