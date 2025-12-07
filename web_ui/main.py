@@ -1,106 +1,6 @@
 import streamlit as st
 import time
 from datetime import datetime
-import re
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-import Dumplings
-import os
-load_dotenv()
-
-
-# ====Agent====
-def get_tool_name(xml: str):
-    xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
-    clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
-    clean_content = clean_pattern.sub('', xml)
-    xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
-    if xml_blocks:
-        for block in xml_blocks:
-            soup = BeautifulSoup(block, "xml")
-            root = soup.find()
-            if root is None:
-                return None
-            tool_name = root.name
-            return tool_name
-    else:
-        return None
-
-class agent(Dumplings.BaseAgent):
-    def __init__(self):
-        super().__init__()
-
-    def out(self,content:str=None):
-        tool_name = get_tool_name(content)
-        if self.uuid=="1":
-            if self.stream_run==True:
-                if tool_name is None:
-                    st.session_state.agent1_messages[-1]=({
-                        "role": "ai",
-                        "content": st.session_state.agent1_messages[-1].get("content")+content,
-                        "timestamp": datetime.now()
-                    })
-                else:
-                    st.session_state.agent1_messages[-1]=({
-                        "role": "tool",
-                        "content": "调用工具："+tool_name,
-                        "timestamp": datetime.now()
-                    })
-            elif self.stream_run==False:
-                if content==None:
-                    st.session_state.agent1_messages.append({
-                        "role": "ai",
-                        "content": "",
-                        "timestamp": ""
-                    })
-                st.rerun()
-
-        if self.uuid=="2":
-            if self.stream_run==True:
-                if tool_name is None:
-                    st.session_state.agent2_messages[-1]=({
-                        "role": "ai",
-                        "content": st.session_state.agent2_messages[-1].get("content")+content,
-                        "timestamp": datetime.now()
-                    })
-                else:
-                    st.session_state.agent2_messages[-1]=({
-                        "role": "tool",
-                        "content": "调用工具："+tool_name,
-                        "timestamp": datetime.now()
-                    })
-            elif self.stream_run==False:
-                if content==None:
-                    st.session_state.agent2_messages.append({
-                        "role": "ai",
-                        "content": "",
-                        "timestamp": ""
-                    })
-                st.rerun()
-
-
-@Dumplings.tool_registry.register_tool(allowed_agents=["8841cd45eef54217bc8122cafebe5fd6", "time_agent"], name="get_time")
-def get_time(xml:str) -> str:
-    return "11:03"
-
-@Dumplings.register_agent("1", "scheduling_agent")
-class scheduling_agent(agent):
-    prompt = f"你是一个名为汤圆Agent的AGI，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签退出对话， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"
-    api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    model_name = "deepseek-v3.2-exp"
-    api_key = os.getenv("API_KEY")
-    def __init__(self):
-        super().__init__()
-
-@Dumplings.register_agent("2", "time_agent")
-class time_agent(agent):
-    prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你还有get_time可以查询时间（直接<get_time></get_time>即可）"
-    api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    model_name = "deepseek-v3.2-exp"
-    api_key = os.getenv("API_KEY")
-    def __init__(self):
-        super().__init__()
-
 
 # 页面配置
 st.set_page_config(
@@ -349,7 +249,7 @@ st.html("""
         font-weight: 600;
         box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
     }
-    
+
     .typing-indicator {
         display: flex;
         align-items: center;
@@ -536,7 +436,7 @@ st.html("""
     /* =========================================== */
     /* 状态栏样式 - 改为黑色 */
     /* =========================================== */
-    
+
     /* 状态栏容器 */
     .st-emotion-cache-1qg05tj.e1f1d6gn1 {
         background-color: #1a1a1a !important;
@@ -613,7 +513,7 @@ st.html("""
             padding: 10px 15px !important;
             margin: 15px 10px !important;
         }
-        
+
         .st-caption {
             font-size: 0.85rem !important;
             padding: 5px 8px !important;
@@ -642,16 +542,6 @@ def init_session_state():
             "role": "ai",
             "content": "您好！我是调度Agent。我可以处理您的问题，并在需要时召唤时间Agent提供专业支持。",
             "timestamp": datetime.now()
-        })
-        st.session_state.agent1_messages.append({
-            "role": "ai",
-            "content": "",
-            "timestamp": ""
-        })
-        st.session_state.agent2_messages.append({
-            "role": "ai",
-            "content": "",
-            "timestamp": ""
         })
 
 
@@ -910,14 +800,91 @@ if send_button and user_input.strip() and not st.session_state.is_processing:
     # 模拟 Agent 对话流程
     st.rerun()
 
-
-
 # 模拟 Agent 对话流程
 if st.session_state.is_processing:
-    schedule_agent = Dumplings.agent_list["1"]
-    schedule_agent.conversation_with_tool("你现在有一个id为2的同伴，请求它帮你查看现在时间")
+    # 根据当前状态模拟对话
+    if st.session_state.current_agent == "scheduling_agent":
+        # 第一步：调度 Agent 回复
+        time.sleep(1.5)
+        st.session_state.agent1_messages.append({
+            "role": "ai",
+            "content": "我理解您的问题，让我为您分析一下。",
+            "timestamp": datetime.now()
+        })
+        st.session_state.current_agent = "calling_ai2"
+        st.rerun()
 
+    elif st.session_state.current_agent == "calling_ai2":
+        # 调度 Agent 召唤时间Agent
+        time.sleep(1)
+        st.session_state.agent1_messages.append({
+            "role": "ai",
+            "content": "让我召唤时间Agent来提供更专业的意见。",
+            "timestamp": datetime.now()
+        })
 
+        # 切换到双列模式
+        st.session_state.show_dual = True
+
+        st.session_state.current_agent = "time_agent_thinking"
+        st.rerun()
+
+    elif st.session_state.current_agent == "time_agent_thinking":
+        # 时间 Agent 开始处理
+        time.sleep(1.5)
+        st.session_state.agent2_messages.append({
+            "role": "ai",
+            "content": "感谢调度Agent的召唤。我正在查询当前时间...",
+            "timestamp": datetime.now()
+        })
+        st.session_state.current_agent = "time_agent_tool"
+        st.rerun()
+
+    elif st.session_state.current_agent == "time_agent_tool":
+        # 时间 Agent 调用工具
+        time.sleep(1)
+        st.session_state.agent2_messages.append({
+            "role": "tool",
+            "content": "调用工具：get_time",
+            "timestamp": datetime.now()
+        })
+        st.session_state.current_agent = "time_agent_result"
+        st.rerun()
+
+    elif st.session_state.current_agent == "time_agent_result":
+        # 时间 Agent 返回结果
+        time.sleep(1.5)
+        st.session_state.agent2_messages.append({
+            "role": "ai",
+            "content": "✅ 查询成功！当前时间是：11:03",
+            "timestamp": datetime.now()
+        })
+        st.session_state.current_agent = "scheduling_summary"
+        st.rerun()
+
+    elif st.session_state.current_agent == "scheduling_summary":
+        # 调度 Agent 总结
+        time.sleep(1)
+        st.session_state.agent1_messages.append({
+            "role": "ai",
+            "content": "感谢时间Agent的补充。基于我们的讨论，当前时间是11:03。",
+            "timestamp": datetime.now()
+        })
+        st.session_state.current_agent = "completion"
+        st.rerun()
+
+    elif st.session_state.current_agent == "completion":
+        # 调度 Agent 标记任务完成
+        time.sleep(0.5)
+        st.session_state.agent1_messages.append({
+            "role": "tool",
+            "content": "🏁 标记任务完成",
+            "timestamp": datetime.now()
+        })
+
+        st.session_state.is_processing = False
+        st.session_state.current_agent = None
+        st.rerun()
 
 # 替换原来的状态栏代码
 st.html(f"""

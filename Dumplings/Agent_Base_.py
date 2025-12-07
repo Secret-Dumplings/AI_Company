@@ -41,6 +41,7 @@ class Agent(ABC):
         self.uuid=self.__class__.uuid
         self.name=self.__class__.name
         self.stream_run=False
+        self.stream = True
         from .agent_tool import tool_registry
         agent_name = getattr(self.__class__, 'name', None) or getattr(self.__class__, '__name__', None)
         if agent_name and self.uuid:
@@ -71,7 +72,7 @@ class Agent(ABC):
         payload = {
             "model": self.model_name,
             "messages": self.history,
-            "stream": True,
+            "stream": self.stream,
             "stream_options": {"include_usage": True}
         }
         rsp = requests.post(self.api_provider,
@@ -87,7 +88,7 @@ class Agent(ABC):
         payload = {
             "model": self.model_name,
             "messages": self.history,
-            "stream": True,
+            "stream": self.stream,
             "stream_options": {"include_usage": True}
         }
         rsp = requests.post(
@@ -96,7 +97,7 @@ class Agent(ABC):
                      "Accept-Charset": "utf-8",
                      "Accept": "text/event-stream"},
             json=payload,
-            stream=True
+            stream=self.stream
         )
         rsp.encoding = 'utf-8'
 
