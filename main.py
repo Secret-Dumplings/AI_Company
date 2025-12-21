@@ -21,7 +21,7 @@ def get_time(xml:str) -> str:
 
 @Dumplings.register_agent(uuid.uuid4().hex, "scheduling_agent")
 class scheduling_agent(Dumplings.BaseAgent):
-    prompt = f"你是一个名为汤圆Agent的AGI，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签退出对话， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"
+    prompt = f"你是一个名为汤圆Agent的AGI，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签直接退出对话（你不可再次获得任何信息）， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     model_name = "deepseek-v3.2-exp"
     api_key = os.getenv("API_KEY")

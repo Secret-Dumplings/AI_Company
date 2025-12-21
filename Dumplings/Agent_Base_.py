@@ -7,6 +7,7 @@ import sys
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
 from loguru import logger #配置日志
+
 try:
     from .agent_tool import tool_registry
 except:
@@ -117,14 +118,14 @@ class Agent(ABC):
             content = delta.get('content', '')
             if content:
                 full_content += content
-                self.out(content)
+                self.pack(content,finish_task=False)
             usage = chunk.get('usage')
             if usage:
                 self.stream_run = False
-                self.out(None)
-                self.out(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
+                self.pack(finish_task=True)
+                self.pack(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
                       f"生成 {usage['completion_tokens']} tokens，"
-                      f"总计 {usage['total_tokens']} tokens。")
+                      f"总计 {usage['total_tokens']} tokens。", other=True)
         logger.info(full_content)
 
         # 1. 去掉工具块后再存历史，防止循环触发
@@ -177,6 +178,8 @@ class Agent(ABC):
                 continue
 
             logger.info(f"从 {tool_source} 找到工具 {tool_name}")
+            print(block)
+            self.pack(tool_name= tool_name, tool_parameter=tool_func)
 
             # 执行工具
             # try:
@@ -192,7 +195,7 @@ class Agent(ABC):
 
         #如配置错误强制跳出避免堵塞
         if "<attempt_completion>" in full_content:
-            self.out("\n[系统] AI 已标记任务完成，程序退出。")
+            self.pack("\n[系统] AI 已标记任务完成，程序退出。", tool_name="attempt_completion")
             sys.exit(0)
 
         # 3. 若工具产生结果，继续对话
@@ -231,11 +234,39 @@ class Agent(ABC):
                 similar_tools.append(available_tool)
         return similar_tools[:3]  # 最多返回3个相似工具
 
-    def out(self, content: str):
-        if self.stream_run:
-            print(content, end='', flush=True)
+    def pack(self, message=None,tool_model=False, tool_name=None, tool_parameter=None, finish_task=False, other=False):
+        content = {}
+        if finish_task:
+            content = {
+                "task": True
+            }
+        elif tool_model:
+            content = {
+                "tool_name": tool_name,
+                "tool_parameter": tool_parameter,
+                "ai_uuid": self.uuid,
+                "ai_name": self.name,
+                "task": False
+            }
         else:
-            print("\ndone")
+            content = {
+            "message": message,
+            "ai_uuid": self.uuid,
+            "ai_name": self.name,
+            "other": other,
+            "task": False
+        }
+        self.out(content)
+
+    def out(self, content):
+        if content.get("tool_name"):
+            print("调用工具:", content.get("tool_name"),"参数", content.get("tool_parameter"))
+            return
+        if not content.get("task"):
+            print(content.get("message"),end="")
+        else:
+            print()
+
 
     def ask_for_help(self, xml_block: str):
         """
