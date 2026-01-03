@@ -72,6 +72,9 @@ class SSEAgentWrapper:
         self.uuid = getattr(agent_instance, 'uuid', str(uuid.uuid4()))
         self.name = getattr(agent_instance, 'name', 'unknown_agent')
 
+        # 用于收集完整的AI回复
+        self.full_response_parts = []
+
         # 替换 out 方法为 SSE 版本
         agent_instance.out = self.sse_out
 
@@ -84,23 +87,46 @@ class SSEAgentWrapper:
         """
         if self.sse_queue is not None:
             try:
+                # 收集AI回复部分
+                if content.get("message") and not content.get("task") and not content.get("tool_name"):
+                    self.full_response_parts.append(content.get("message"))
+
+                # 检查是否是空的结束消息
+                if content.get("message") is None and "ai_uuid" in content:
+                    # 如果有收集到的完整回复，先发送完整回复
+                    if self.full_response_parts:
+                        full_message = "".join(self.full_response_parts)
+                        if full_message.strip():
+                            self.sse_queue.put({
+                                "type": "ai_complete",
+                                "message": full_message,
+                                "ai_uuid": self.uuid,
+                                "ai_name": self.name
+                            })
+                        # 清空收集的回复
+                        self.full_response_parts = []
+
+                    # 发送完成标志
+                    self.sse_queue.put({
+                        "type": "completion",
+                        "message": "✅ AI回复已完成",
+                        "ai_uuid": self.uuid,
+                        "ai_name": self.name,
+                        "is_final": True
+                    })
+                    return
+
                 # 确保包含 agent 信息
                 if 'ai_uuid' not in content:
                     content['ai_uuid'] = self.uuid
                 if 'ai_name' not in content:
                     content['ai_name'] = self.name
 
-                # 发送到 SSE 队列
-                self.sse_queue.put(content)
+                # 如果不是AI的流式回复，直接发送
+                if content.get("tool_name") or content.get("task"):
+                    self.sse_queue.put(content)
+                    logger.info(f"发送工具/任务消息: {content.get('tool_name') or 'task'}")
 
-                # 记录日志
-                if content.get("tool_name"):
-                    logger.info(f"调用工具: {content.get('tool_name')}")
-                elif content.get("message") and not content.get("task"):
-                    # 只记录长度，避免日志过长
-                    msg = content.get("message", "")
-                    if msg and msg.strip():
-                        logger.info(f"AI回复长度: {len(msg)} 字符")
             except Exception as e:
                 logger.error(f"发送到 SSE 队列失败: {e}")
                 logger.error(f"失败的内容: {content}")
@@ -110,6 +136,9 @@ class SSEAgentWrapper:
 
     def conversation_with_tool(self, message=None):
         """代理 conversation_with_tool 方法"""
+        # 重置回复收集
+        self.full_response_parts = []
+
         try:
             return self.agent.conversation_with_tool(message)
         except Exception as e:
@@ -165,8 +194,6 @@ class AgentServer:
                     return None
 
                 # 创建 Agent 的深拷贝，避免状态共享
-                # 注意：这里需要根据实际情况决定是否需要深拷贝
-                # 如果 Agent 有复杂状态，可能需要深拷贝
                 try:
                     # 尝试深拷贝
                     agent_copy = copy.deepcopy(agent_instance)
@@ -225,14 +252,6 @@ class AgentServer:
                     result = agent_wrapper.conversation_with_tool(message)
                     logger.info(f"对话完成: {message}")
 
-                    # 如果需要，可以发送完成消息
-                    if uid in self.user_queues:
-                        self.user_queues[uid].put({
-                            "type": "completion",
-                            "message": "对话已完成",
-                            "result_type": str(type(result))
-                        })
-
                     return result
                 except Exception as e:
                     logger.error(f"对话执行错误: {e}")
@@ -241,7 +260,9 @@ class AgentServer:
                     if uid in self.user_queues:
                         self.user_queues[uid].put({
                             "type": "error",
-                            "message": f"对话执行错误: {str(e)}"
+                            "message": f"对话执行错误: {str(e)}",
+                            "ai_uuid": agent_wrapper.uuid,
+                            "ai_name": agent_wrapper.name
                         })
 
             thread = threading.Thread(target=run_conversation)
@@ -297,6 +318,13 @@ def index():
                      border-radius: 5px; }
             #uid-display { font-weight: bold; color: #0066cc; }
             .message-header { font-size: 12px; color: #888; margin-bottom: 2px; }
+            .completion { color: #28a745; margin: 8px 0; padding: 8px 12px; background: #e6ffe6; border-radius: 10px;
+                         border-left: 4px solid #28a745; }
+            .message-content {
+                word-wrap: break-word;
+                white-space: pre-wrap;
+                margin-top: 4px;
+            }
         </style>
     </head>
     <body>
@@ -327,6 +355,8 @@ def index():
             let uid = localStorage.getItem('agent_user_id') || ('user_' + Date.now());
             let currentAgent = 'scheduling_agent';
             let eventSource = null;
+            let currentAiMessageDiv = null;
+            let currentAiUuid = null;
 
             // 显示用户ID和当前Agent
             document.getElementById('uid-display').textContent = uid;
@@ -361,14 +391,20 @@ def index():
             function displayMessage(data) {
                 const messagesDiv = document.getElementById('messages');
 
-                // 创建消息容器
-                const msgDiv = document.createElement('div');
-
-                // 根据消息类型设置样式
+                // 根据消息类型处理
                 if (data.type === 'error') {
+                    // 错误消息
+                    const msgDiv = document.createElement('div');
                     msgDiv.className = 'error';
                     msgDiv.innerHTML = `<div class="message-header">❌ 错误</div><strong>${data.message || '未知错误'}</strong>`;
+                    messagesDiv.appendChild(msgDiv);
+
+                    // 重置当前AI消息状态
+                    currentAiMessageDiv = null;
+                    currentAiUuid = null;
                 } else if (data.tool_name) {
+                    // 工具调用消息
+                    const msgDiv = document.createElement('div');
                     msgDiv.className = 'tool';
                     msgDiv.innerHTML = `<div class="message-header">🛠️ 工具调用</div>
                                        <strong>${data.tool_name}</strong>`;
@@ -378,26 +414,76 @@ def index():
                     if (data.ai_name) {
                         msgDiv.innerHTML += `<br><small>来自: ${data.ai_name} (${data.ai_uuid})</small>`;
                     }
-                } else if (data.message && !data.task) {
+                    messagesDiv.appendChild(msgDiv);
+
+                    // 重置当前AI消息状态
+                    currentAiMessageDiv = null;
+                    currentAiUuid = null;
+                } else if (data.type === 'ai_complete') {
+                    // 完整的AI回复消息
+                    const msgDiv = document.createElement('div');
                     msgDiv.className = 'ai';
                     let agentInfo = data.ai_name ? `${data.ai_name}` : currentAgent;
-                    msgDiv.innerHTML = `<div class="message-header">🤖 ${agentInfo}</div>${data.message}`;
+                    msgDiv.innerHTML = `<div class="message-header">🤖 ${agentInfo}</div>
+                                       <div class="message-content">${escapeHtml(data.message)}</div>`;
+                    messagesDiv.appendChild(msgDiv);
+
+                    // 重置当前AI消息状态
+                    currentAiMessageDiv = null;
+                    currentAiUuid = null;
                 } else if (data.task) {
+                    // 任务完成消息
+                    const msgDiv = document.createElement('div');
                     msgDiv.className = 'info';
                     msgDiv.textContent = '✅ 任务完成';
+                    messagesDiv.appendChild(msgDiv);
+
+                    // 重置当前AI消息状态
+                    currentAiMessageDiv = null;
+                    currentAiUuid = null;
                 } else if (data.type === 'connect') {
+                    // 连接消息
+                    const msgDiv = document.createElement('div');
                     msgDiv.className = 'info';
                     msgDiv.textContent = `🔗 ${data.message}`;
-                } else if (data.type === 'completion') {
-                    msgDiv.className = 'info';
-                    msgDiv.textContent = `✅ ${data.message}`;
+                    messagesDiv.appendChild(msgDiv);
+                } else if (data.type === 'completion' && data.is_final) {
+                    // 最终完成消息
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'completion';
+                    let agentInfo = data.ai_name ? `${data.ai_name}` : currentAgent;
+                    msgDiv.innerHTML = `<div class="message-header">✅ ${agentInfo} 完成</div>${data.message || 'AI回复已完成'}`;
+                    messagesDiv.appendChild(msgDiv);
+
+                    // 重置当前AI消息状态
+                    currentAiMessageDiv = null;
+                    currentAiUuid = null;
                 } else {
-                    msgDiv.className = 'info';
-                    msgDiv.textContent = JSON.stringify(data);
+                    // 其他消息（可能是流式回复的chunk，但我们已不直接显示这些）
+                    // 这里可以添加一个调试开关来显示这些chunk
+                    const debugMode = false; // 设置为true以显示流式chunk
+                    if (debugMode && data.message && !data.task) {
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = 'info';
+                        msgDiv.innerHTML = `<div class="message-header">📝 流式chunk</div>
+                                           <small>${escapeHtml(data.message.substring(0, 50))}...</small>`;
+                        messagesDiv.appendChild(msgDiv);
+                    }
                 }
 
-                messagesDiv.appendChild(msgDiv);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+
+            // HTML转义函数
+            function escapeHtml(text) {
+                const map = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;'
+                };
+                return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
             }
 
             // 添加错误消息
@@ -408,6 +494,10 @@ def index():
                 errorDiv.innerHTML = `<div class="message-header">❌ 系统错误</div>${text}`;
                 messagesDiv.appendChild(errorDiv);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+                // 重置当前AI消息状态
+                currentAiMessageDiv = null;
+                currentAiUuid = null;
             }
 
             // 发送消息
@@ -424,12 +514,16 @@ def index():
                 const messagesDiv = document.getElementById('messages');
                 const userMsg = document.createElement('div');
                 userMsg.className = 'user';
-                userMsg.innerHTML = `<div class="message-header">👤 你</div>${message}`;
+                userMsg.innerHTML = `<div class="message-header">👤 你</div>${escapeHtml(message)}`;
                 messagesDiv.appendChild(userMsg);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
                 input.value = '';
                 input.focus();
+
+                // 重置当前AI消息状态
+                currentAiMessageDiv = null;
+                currentAiUuid = null;
 
                 // 发送到服务器
                 fetch('/ask', {
@@ -480,6 +574,8 @@ def index():
                 if (confirm('确定要清空所有消息吗？')) {
                     document.getElementById('messages').innerHTML = 
                         '<div class="info">对话已清空</div>';
+                    currentAiMessageDiv = null;
+                    currentAiUuid = null;
                 }
             }
 
@@ -726,6 +822,7 @@ def main():
     logger.info(f"SSE 端点: /stream?uid=<用户ID>")
     logger.info(f"消息端点: POST /ask")
     logger.info(f"健康检查: /health")
+    logger.info(f"调试信息: /debug")
     logger.info("按 Ctrl+C 停止服务器")
     logger.info("=" * 60)
 
