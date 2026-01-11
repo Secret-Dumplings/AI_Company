@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多智能体对话系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ url_for('static', filename='js/chat.js') }}" as="script">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar" role="navigation" aria-label="主要导航">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h2>多智能体对话系统</h2>
+            </div>
+            <div class="nav-right">
+                <div class="user-avatar" title="{{ session.username }}" aria-label="用户头像">
+                    {{ session.username[0].upper() }}
+                </div>
+                <a href="/logout" class="logout-btn" title="登出" aria-label="退出登录">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="app-container" id="appContainer">
+        <main class="chat-container" role="main" aria-label="聊天界面">
+            <div class="chat-messages" id="chatMessages" aria-live="polite" aria-label="聊天消息">
+                <!-- 消息将在这里动态添加 -->
+            </div>
+            <form id="chatForm" class="chat-input" aria-label="发送消息表单">
+                <textarea id="userInput" placeholder="输入您的消息..." autocomplete="off" rows="1"></textarea>
+                <button type="submit" id="sendButton" aria-label="发送消息">
+                    发送
+                </button>
+            </form>
+        </main>
+    </div>
+
+    <!-- 添加错误显示区域 -->
+    <div id="errorDisplay" class="error-message" style="display: none;" role="alert" aria-live="assertive"></div>
+
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ url_for('static', filename='js/chat.js') }}" as="script">
+
+    <!-- 将脚本放在底部并添加错误处理 -->
+    <script>
+        // 预加载检测
+        window.addEventListener('DOMContentLoaded', function() {
+            // 添加页面加载状态
+            document.body.classList.add('loaded');
+
+            // 检查关键资源是否加载成功
+            const checkResources = setInterval(() => {
+                if (typeof addMessage !== 'undefined') {
+                    clearInterval(checkResources);
+                    // 页面初始化完成
+                    console.log('Chat interface loaded successfully');
+                }
+            }, 100);
+
+            // 设置超时
+            setTimeout(() => {
+                if (typeof addMessage === 'undefined') {
+                    const errorDiv = document.getElementById('errorDisplay');
+<!--                    if (errorDiv) {-->
+<!--                        errorDiv.style.display = 'block';-->
+<!--                        errorDiv.textContent = '页面加载失败，请刷新重试。';-->
+<!--                    }-->
+                }
+            }, 5000);
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
+</body>
+</html>
