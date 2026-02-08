@@ -25,6 +25,7 @@ class scheduling_agent(Dumplings.BaseAgent):
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
     model_name = "deepseek-v3.2-exp"
     api_key = os.getenv("API_KEY")
+    fc_model = True
     def __init__(self):
         super().__init__()
 
