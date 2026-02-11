@@ -300,6 +300,32 @@ class Agent(ABC):
         # self.history.append({"role": "assistant", "content": reply})
         return reply
 
+    def list_agents(self, xml_block: str):
+        """
+        工具方法：返回所有可用的Agent列表，包括它们的UUID和名称
+        """
+        from Dumplings import agent_list
+
+        # 获取所有唯一的Agent（避免UUID和名称重复）
+        unique_agents = {}
+        for key, agent in agent_list.items():
+            agent_uuid = getattr(agent, 'uuid', None)
+            agent_name = getattr(agent, 'name', None)
+            if agent_uuid and agent_name:
+                if agent_uuid not in unique_agents:
+                    unique_agents[agent_uuid] = {
+                        'uuid': agent_uuid,
+                        'name': agent_name
+                    }
+
+        # 格式化为易读的字符串
+        agents_info = []
+        for agent_info in unique_agents.values():
+            agents_info.append(f"- {agent_info['name']} (UUID: {agent_info['uuid']})")
+
+        result = "可用的Agent列表：\n" + "\n".join(agents_info)
+        return result
+
     def attempt_completion(self, xml_block: str):
         from bs4 import BeautifulSoup  # 方法内 import 避免循环
         soup = BeautifulSoup(xml_block, "xml")
