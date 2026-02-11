@@ -47,7 +47,39 @@ class Agent(ABC):
         agent_name = getattr(self.__class__, 'name', None) or getattr(self.__class__, '__name__', None)
         if agent_name and self.uuid:
             tool_registry.register_agent_uuid(self.uuid, agent_name)
-        prompt = self.prompt + ", 你的uuid " + str(self.uuid)
+
+        # 获取该 agent 有权限的所有工具信息
+        tools_info = tool_registry.get_all_tools_info(self.uuid)
+        tools_prompt = ""
+        tools_list = []
+
+        # 添加注册的工具
+        if tools_info:
+            tools_list.extend(tools_info.keys())
+
+        # 添加内置工具方法（如果存在且可调用）
+        builtin_tools = {
+            'ask_for_help': '请求其他Agent帮助，参数: agent_id(目标Agent的UUID或名称), message(请求内容)',
+            'list_agents': '列出所有可用的Agent及其UUID和名称',
+            'attempt_completion': '标记任务完成并退出，参数: report_content(汇报内容，可选)'
+        }
+
+        for tool_name, tool_desc in builtin_tools.items():
+            if hasattr(self, tool_name) and callable(getattr(self, tool_name)):
+                tools_list.append(tool_name)
+
+        # 生成工具提示
+        if tools_list:
+            tools_prompt = "\n\n你可以使用以下工具：\n"
+            # 注册的工具
+            for tool_name, tool_info in tools_info.items():
+                tools_prompt += f"- {tool_name}: {tool_info['description']}\n"
+            # 内置工具
+            for tool_name, tool_desc in builtin_tools.items():
+                if tool_name in tools_list and tool_name not in tools_info:
+                    tools_prompt += f"- {tool_name}: {tool_desc}\n"
+
+        prompt = self.prompt + tools_prompt + ", 你的uuid " + str(self.uuid)
         logger.info("prompt:"+str(prompt))
         # print(prompt)
         self.history = [{"role": "system", "content": prompt}]
@@ -83,15 +115,84 @@ class Agent(ABC):
         return rsp.status_code == 200
 
     # ---------------- 主对话函数 ----------------
-    def conversation_with_tool(self, messages=None,tool=False):
+    def conversation_with_tool(self, messages=None, tool=False):
         if messages:
             self.history.append({"role": "user", "content": messages})
-        payload = {
-            "model": self.model_name,
-            "messages": self.history,
-            "stream": self.stream,
-            "stream_options": {"include_usage": True}
-        }
+
+        # 检查是否使用 Function Calling
+        fc_enabled = hasattr(self, 'fc_model') and self.fc_model
+
+        if fc_enabled:
+            # Function Calling 模式
+            tools_schema = tool_registry.get_all_tools_schema(self.uuid)
+
+            # 添加内置工具到 schema
+            builtin_tools_schema = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "ask_for_help",
+                        "description": "请求其他Agent帮助",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "agent_id": {"type": "string", "description": "目标Agent的UUID或名称"},
+                                "message": {"type": "string", "description": "请求内容"}
+                            },
+                            "required": ["agent_id", "message"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "list_agents",
+                        "description": "列出所有可用的Agent及其UUID和名称",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "attempt_completion",
+                        "description": "标记任务完成并退出",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "report_content": {"type": "string", "description": "汇报内容（可选）"}
+                            },
+                            "required": []
+                        }
+                    }
+                }
+            ]
+
+            # 合并内置工具和注册工具的schema
+            for builtin_tool in builtin_tools_schema:
+                if hasattr(self, builtin_tool['function']['name']) and callable(getattr(self, builtin_tool['function']['name'])):
+                    tools_schema.append(builtin_tool)
+
+            payload = {
+                "model": self.model_name,
+                "messages": self.history,
+                "stream": self.stream,
+                "stream_options": {"include_usage": True},
+                "tools": tools_schema,
+                "tool_choice": "auto"
+            }
+        else:
+            # XML 模式（原有逻辑）
+            payload = {
+                "model": self.model_name,
+                "messages": self.history,
+                "stream": self.stream,
+                "stream_options": {"include_usage": True}
+            }
+
         rsp = requests.post(
             self.api_provider,
             headers={**self.headers,
@@ -104,39 +205,155 @@ class Agent(ABC):
 
         full_content = ""
         self.stream_run = True
-        for line in rsp.iter_lines(decode_unicode=True):
-            if not line or not line.startswith('data: '):
-                continue
-            data = line[6:]
-            if data == '[DONE]':
-                break
+        tool_calls_list = []  # 存储所有 tool_calls
+
+        if self.stream:
+            # 流式响应处理
+            for line in rsp.iter_lines(decode_unicode=True):
+                if not line or not line.startswith('data: '):
+                    continue
+                data = line[6:]
+                if data == '[DONE]':
+                    break
+                try:
+                    chunk = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+
+                delta = (chunk.get('choices') or [{}])[0].get('delta') or {}
+
+                # Function Calling: 处理 tool_calls
+                if fc_enabled:
+                    tool_calls = delta.get('tool_calls')
+                    if tool_calls:
+                        for call in tool_calls:
+                            # 初始化或更新 tool_calls_list
+                            if call.get('index') is not None:
+                                idx = call['index']
+                                if idx >= len(tool_calls_list):
+                                    tool_calls_list.append({
+                                        'id': call.get('id'),
+                                        'function': {
+                                            'name': call['function']['name'],
+                                            'arguments': call['function'].get('arguments') or ''
+                                        }
+                                    })
+                                else:
+                                    if 'arguments' in call['function'] and call['function']['arguments'] is not None:
+                                        tool_calls_list[idx]['function']['arguments'] += call['function']['arguments']
+                            continue
+
+                # 普通 content
+                content = delta.get('content', '')
+                if content:
+                    full_content += content
+                    self.pack(content, finish_task=False)
+
+                usage = chunk.get('usage')
+                if usage:
+                    self.stream_run = False
+                    self.pack(finish_task=True)
+                    self.pack(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
+                          f"生成 {usage['completion_tokens']} tokens，"
+                          f"总计 {usage['total_tokens']} tokens。", other=True)
+        else:
+            # 非流式响应处理
             try:
-                chunk = json.loads(data)
-            except json.JSONDecodeError:
-                continue
-            delta = (chunk.get('choices') or [{}])[0].get('delta') or {}
-            content = delta.get('content', '')
-            if content:
-                full_content += content
-                self.pack(content,finish_task=False)
-            usage = chunk.get('usage')
-            if usage:
-                self.stream_run = False
-                self.pack(finish_task=True)
-                self.pack(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
-                      f"生成 {usage['completion_tokens']} tokens，"
-                      f"总计 {usage['total_tokens']} tokens。", other=True)
+                response_json = rsp.json()
+                message = response_json['choices'][0]['message']
+                full_content = message.get('content', '')
+
+                # Function Calling: 处理 tool_calls
+                if fc_enabled:
+                    tool_calls_list = message.get('tool_calls', [])
+
+                if full_content:
+                    self.pack(full_content, finish_task=False)
+                usage = response_json.get('usage', {})
+                if usage:
+                    self.pack(finish_task=True)
+                    self.pack(f"\n本次请求用量：提示 {usage['prompt_tokens']} tokens，"
+                          f"生成 {usage['completion_tokens']} tokens，"
+                          f"总计 {usage['total_tokens']} tokens。", other=True)
+            except Exception as e:
+                logger.error(f"非流式响应处理错误: {e}")
+                full_content = rsp.text
+
         logger.info(full_content)
 
-        # 1. 去掉工具块后再存历史，防止循环触发
-        xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
-        # clean_for_history = xml_pattern.sub('', full_content).strip()
-        # self.history.append({"role": "assistant", "content": clean_for_history})
+        # Function Calling: 执行工具调用
+        if fc_enabled and tool_calls_list:
+            logger.info(f"发现 Function Calling 工具调用: {tool_calls_list}")
 
-        # 2. 提取并执行工具
+            # 添加 assistant message with tool_calls
+            self.history.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": tool_calls_list
+            })
+
+            tool_results = []
+            for tool_call in tool_calls_list:
+                tool_name = tool_call['function']['name']
+                tool_id = tool_call['id']
+
+                # 查找工具
+                tool_func = None
+                if tool_registry.check_permission(self.uuid, tool_name):
+                    tool_info = tool_registry.get_tool_info(tool_name)
+                    if tool_info is not None:
+                        tool_func = tool_info['function']
+
+                if tool_func is None and hasattr(self, tool_name):
+                    method = getattr(self, tool_name)
+                    if callable(method):
+                        tool_func = method
+
+                if tool_func is None:
+                    error_msg = f"找不到工具 '{tool_name}'"
+                    logger.warning(error_msg)
+                    tool_results.append({"error": error_msg})
+                    continue
+
+                # 调用工具（解析 arguments 为 dict）
+                try:
+                    args = json.loads(tool_call['function']['arguments'])
+                    logger.info(f"调用工具 {tool_name}，参数: {args}")
+                    self.pack(tool_name=tool_name, tool_parameter=args)
+                    result = tool_func(**args)
+                    tool_results.append({
+                        'tool_call_id': tool_id,
+                        'name': tool_name,
+                        'content': result
+                    })
+                except Exception as e:
+                    error_msg = f"执行工具 {tool_name} 时出错: {str(e)}"
+                    logger.error(error_msg)
+                    tool_results.append({
+                        'tool_call_id': tool_id,
+                        'name': tool_name,
+                        'content': error_msg
+                    })
+
+            # 添加 tool responses 到历史
+            for result in tool_results:
+                self.history.append({
+                    "role": "tool",
+                    "tool_call_id": result['tool_call_id'],
+                    "name": result['name'],
+                    "content": result['content']
+                })
+
+            # 继续对话
+            logger.info("工具执行完成，继续对话")
+            return self.conversation_with_tool(tool=True)
+
+        # XML 模式：提取并执行工具
+        xml_pattern = re.compile(r'<(\w+)>.*?</\1>', flags=re.S)
         clean_pattern = re.compile(r'</?(out_text|thinking)>', flags=re.S)
         clean_content = clean_pattern.sub('', full_content)
         xml_blocks = [m.group(0) for m in xml_pattern.finditer(clean_content)]
+
         tool_results = []
         tool_names = []
         for block in xml_blocks:
@@ -182,16 +399,9 @@ class Agent(ABC):
             self.pack(tool_name= tool_name, tool_parameter=tool_func)
 
             # 执行工具
-            # try:
-            #获得报错回溯
             result = tool_func(block)
             tool_results.append(result)
             tool_names.append(tool_name)
-            # except Exception as e:
-            #     error_msg = f"执行工具 {tool_name} 时出错: {str(e)}"
-            #     self.history.append({"role": "system", "content": error_msg})
-            #     tool_results.append({"error": error_msg})
-            #     logger.error(f"工具执行错误: {error_msg}")
 
         #如配置错误强制跳出避免堵塞
         if "<attempt_completion>" in full_content:
@@ -251,39 +461,47 @@ class Agent(ABC):
             print()
 
 
-    def ask_for_help(self, xml_block: str):
+    def ask_for_help(self, **kwargs):
         """
-        实例方法版 ask_for_help，可直接访问 self.__class__.agent_list
+        工具方法：请求其他 Agent 帮助
+        参数可以通过 XML 或 Function Calling 传递
         """
-        from bs4 import BeautifulSoup  # 方法内 import 避免循环
-        soup = BeautifulSoup(xml_block, "xml")
+        # 支持两种调用方式
+        agent_id = None
+        message = None
 
-        agent_id_tag = soup.find("agent_id")
-        message_tag = soup.find("message")
-        if agent_id_tag is None:
-            # self.history.append({"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"})
+        # Function Calling 方式（dict 参数）
+        if 'agent_id' in kwargs and 'message' in kwargs:
+            agent_id = kwargs['agent_id']
+            message = kwargs['message']
+        # XML 方式（字符串参数）
+        elif len(kwargs) == 1:
+            xml_block = list(kwargs.values())[0]
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(xml_block, "xml")
+            agent_id_tag = soup.find("agent_id")
+            message_tag = soup.find("message")
+            if agent_id_tag:
+                agent_id = agent_id_tag.text.strip()
+            if message_tag:
+                message = message_tag.text.strip()
+
+        if agent_id is None:
             return {"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"}
-        if message_tag is None:
-            # self.history.append({"role": "system", "content": "<ask_for_help> 缺少 message 字段"})
+        if message is None:
             return {"role": "system", "content": "<ask_for_help> 缺少 message 字段"}
-
-        agent_id = agent_id_tag.text.strip()
-        message = message_tag.text.strip()
 
         try:
             from Dumplings import agent_list
-
             target_cls = agent_list[agent_id]
         except KeyError as e:
-            # self.history.append({"role": "system", "content": f"未找到 uuid/别名 {e}"})
             return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
 
         target_ins = target_cls
         reply = target_ins.conversation_with_tool(message)
-        # self.history.append({"role": "assistant", "content": reply})
         return reply
 
-    def list_agents(self, xml_block: str):
+    def list_agents(self, **kwargs):
         """
         工具方法：返回所有可用的Agent列表，包括它们的UUID和名称
         """
@@ -309,15 +527,26 @@ class Agent(ABC):
         result = "可用的Agent列表：\n" + "\n".join(agents_info)
         return result
 
-    def attempt_completion(self, xml_block: str):
-        from bs4 import BeautifulSoup  # 方法内 import 避免循环
-        soup = BeautifulSoup(xml_block, "xml")
+    def attempt_completion(self, **kwargs):
+        """
+        工具方法：标记任务完成并退出
+        """
+        # 支持两种调用方式
+        report_content = ""
 
-        report_content_tag = soup.find("report_content")
+        # Function Calling 方式（dict 参数）
+        if 'report_content' in kwargs:
+            report_content = kwargs['report_content']
+        # XML 方式（字符串参数）
+        elif len(kwargs) == 1:
+            xml_block = list(kwargs.values())[0]
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(xml_block, "xml")
+            report_content_tag = soup.find("report_content")
+            if report_content_tag:
+                report_content = report_content_tag.text
 
-        if report_content_tag is None:
-            sys.exit(0)
-
-        print(report_content_tag)
+        if report_content:
+            print(report_content)
         sys.exit(0)
 
