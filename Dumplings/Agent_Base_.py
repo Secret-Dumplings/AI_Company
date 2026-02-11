@@ -217,23 +217,6 @@ class Agent(ABC):
             return self.history[-1]
         return full_content
 
-    def _get_available_tools_for_agent(self) -> list[str]:
-        """获取当前agent有权限使用的所有工具"""
-        available_tools = []
-        for tool_name, tool_info in tool_registry.list_tools().items():
-            if tool_registry.check_permission(self.name, tool_name):
-                available_tools.append(tool_name)
-        return available_tools
-
-    def _find_similar_tools(self, tool_name: str, available_tools: list[str]) -> list[str]:
-        """查找相似的工具名称"""
-        # 简单的字符串匹配，可以根据需要实现更复杂的相似度算法
-        similar_tools = []
-        for available_tool in available_tools:
-            if tool_name.lower() in available_tool.lower() or available_tool.lower() in tool_name.lower():
-                similar_tools.append(available_tool)
-        return similar_tools[:3]  # 最多返回3个相似工具
-
     def pack(self, message=None,tool_model=False, tool_name=None, tool_parameter=None, finish_task=False, other=False):
         content = {}
         if finish_task:
