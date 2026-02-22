@@ -1,5 +1,4 @@
 import sys
-
 from dotenv import load_dotenv
 import os
 import Dumplings
@@ -33,19 +32,30 @@ def get_time(xml=None):
 class scheduling_agent(Dumplings.BaseAgent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签直接退出对话（你不可再次获得任何信息）， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"""
     prompt = f"你是一个名为汤圆Agent的AGI"
-    api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    model_name = "deepseek-v3.2"
+    api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
+    model_name = "qwen3.5-plus"
     api_key = os.getenv("API_KEY")
     fc_model = True
     def __init__(self):
         super().__init__()
 
+    def out(self, content):
+        #你可以通过劫持out获取内容
+        if content.get("tool_name"):
+            print("调用工具:", content.get("tool_name"), "参数", content.get("tool_parameter"))
+            return
+        if not content.get("task"):
+            print(content.get("message"), end="")
+        else:
+            print()
+
+
 @Dumplings.register_agent("8841cd45eef54217bc8122cafebe5fd6", "time_agent")
 class time_agent(Dumplings.BaseAgent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你还有get_time可以查询时间（直接<get_time></get_time>即可）"""
     prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者， 你可以通过工具获取时间"
-    api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-    model_name = "deepseek-v3.2"
+    api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
+    model_name = "qwen3.5-plus"
     api_key = os.getenv("API_KEY")
     def __init__(self):
         super().__init__()

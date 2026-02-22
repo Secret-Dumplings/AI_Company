@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4>=4.14.2",
+    "dashscope>=1.25.12",
     "dotenv>=0.9.9",
     "fastapi>=0.117.1",
     "flask>=3.1.2",
@@ -27,5 +28,5 @@ dependencies = [
 ]
 
 [[tool.uv.index]]
-url = "https://mirrors.aliyun.com/pypi/simple"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 default = true

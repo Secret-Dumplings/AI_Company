@@ -115,9 +115,34 @@ class Agent(ABC):
         return rsp.status_code == 200
 
     # ---------------- 主对话函数 ----------------
-    def conversation_with_tool(self, messages=None, tool=False):
+    def conversation_with_tool(self, messages=None, tool=False, images=None):
+        """
+        进行对话，支持多模态输入（文本 + 图片）
+
+        Args:
+            messages: 文本消息
+            tool: 是否是工具调用后的继续对话
+            images: 图片列表，可以是 base64 字符串或图片 URL
+        """
         if messages:
-            self.history.append({"role": "user", "content": messages})
+            # 如果有图片，构建多模态内容
+            if images:
+                content_list = [{"type": "text", "text": messages}]
+                for img in images:
+                    if img.startswith("http"):
+                        content_list.append({
+                            "type": "image_url",
+                            "image_url": {"url": img}
+                        })
+                    else:
+                        # 假设是 base64
+                        content_list.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img}"}
+                        })
+                self.history.append({"role": "user", "content": content_list})
+            else:
+                self.history.append({"role": "user", "content": messages})
 
         # 检查是否使用 Function Calling
         fc_enabled = hasattr(self, 'fc_model') and self.fc_model
@@ -180,10 +205,11 @@ class Agent(ABC):
                 "model": self.model_name,
                 "messages": self.history,
                 "stream": self.stream,
-                "stream_options": {"include_usage": True},
                 "tools": tools_schema,
                 "tool_choice": "auto"
             }
+            # if self.stream:
+            #     payload["stream_options"] = {"include_usage": True},
         else:
             # XML 模式（原有逻辑）
             payload = {
@@ -192,6 +218,8 @@ class Agent(ABC):
                 "stream": self.stream,
                 "stream_options": {"include_usage": True}
             }
+            # if self.stream:
+            #     payload["stream_options"] = {"include_usage": True},
 
         rsp = requests.post(
             self.api_provider,
@@ -258,6 +286,7 @@ class Agent(ABC):
                           f"总计 {usage['total_tokens']} tokens。", other=True)
         else:
             # 非流式响应处理
+            self.stream_run = False
             try:
                 response_json = rsp.json()
                 message = response_json['choices'][0]['message']
