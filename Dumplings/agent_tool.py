@@ -5,26 +5,10 @@ tool.py  –  带超详细日志的工具注册器
     export LOGURU_LEVEL=TRACE
     python your_main.py
 """
-from loguru import logger
+from .logging_config import logger
 import os, inspect, sys
 
-# 1. 日志配置 ----------------------------------------------------------
-log_dir = "logs"
-os.makedirs(log_dir, exist_ok=True)
-logger.add(
-    os.path.join(log_dir, "app.log"),
-    rotation="500 MB",
-    retention="10 days",
-    compression="zip",
-    level="TRACE",          # 关键：接收所有级别
-    backtrace=True,
-    diagnose=True           # 打印变量值
-)
-logger.add(
-    sys.stderr,
-    level=os.getenv("LOGURU_LEVEL", "INFO"),
-    format="<green>{time:HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
-)
+# 日志配置已由 logging_config 模块统一管理
 
 # 2. 工具注册器 --------------------------------------------------------
 from functools import wraps

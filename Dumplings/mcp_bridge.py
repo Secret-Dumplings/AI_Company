@@ -1,95 +1,300 @@
 # -*- coding: utf-8 -*-
 """
-MCP Bridge - 将 MCP 服务器工具转换为标准工具（非XML）
+MCP Bridge - 将 MCP 服务器工具转换为标准工具（非 XML）
 使用 Dumplings.tool_registry.register_tool 直接注册
+
+改进：
+- 使用 asyncio.Lock 替代 threading.Lock
+- 复用事件循环
+- 添加会话健康检查和自动回收
+- 添加上下文管理器支持
 """
 import asyncio
 import os
-import threading
-from typing import Optional, Dict, Any, Callable
+import time
+from typing import Optional, Dict, Any, List
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from contextlib import asynccontextmanager
 from .agent_tool import tool_registry
 from loguru import logger
 
 
 # ==================== 全局会话池 ====================
 MCP_SESSION_POOL: Dict[str, Dict[str, Any]] = {}
-SESSION_LOCK = threading.Lock()
+SESSION_LOCK = asyncio.Lock()
+
+# 全局事件循环复用器
+_event_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
+    """
+    获取或创建全局事件循环
+    避免每次工具调用都创建新事件循环
+    """
+    global _event_loop
+    if _event_loop is None or _event_loop.is_closed():
+        try:
+            _event_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # 如果没有当前线程的事件循环，创建一个新的
+            _event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(_event_loop)
+    return _event_loop
+
+
+class MCPSessionPool:
+    """
+    MCP 会话池管理器
+    提供会话健康检查和自动回收功能
+    """
+
+    def __init__(self, max_idle_time: int = 3600):
+        """
+        初始化会话池
+
+        Args:
+            max_idle_time: 最大空闲时间（秒），默认 1 小时
+        """
+        self._pool: Dict[str, Dict[str, Any]] = {}
+        self._lock = asyncio.Lock()
+        self._max_idle_time = max_idle_time
+        self._health_check_task: Optional[asyncio.Task] = None
+
+    async def start_health_check(self, interval: int = 300) -> None:
+        """
+        启动健康检查任务
+
+        Args:
+            interval: 检查间隔（秒），默认 5 分钟
+        """
+        async def _health_check_loop():
+            while True:
+                await asyncio.sleep(interval)
+                await self.health_check()
+
+        self._health_check_task = asyncio.create_task(_health_check_loop())
+        logger.info(f"MCP 会话池健康检查已启动，间隔 {interval} 秒")
+
+    async def stop_health_check(self) -> None:
+        """停止健康检查任务"""
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+            self._health_check_task = None
+            logger.info("MCP 会话池健康检查已停止")
+
+    async def health_check(self) -> int:
+        """
+        检查并回收空闲会话
+
+        Returns:
+            int: 回收的会话数量
+        """
+        async with self._lock:
+            now = time.time()
+            expired = []
+
+            for path, info in self._pool.items():
+                last_used = info.get("last_used", 0)
+                if now - last_used > self._max_idle_time:
+                    expired.append(path)
+
+            recycled_count = 0
+            for path in expired:
+                if await self._close_session(path):
+                    recycled_count += 1
+                    logger.info(f"回收空闲 MCP 会话：{path}")
+
+            return recycled_count
+
+    async def get_session(self, server_path: str) -> ClientSession:
+        """
+        获取或创建会话
+
+        Args:
+            server_path: MCP 服务器路径
+
+        Returns:
+            ClientSession: MCP 会话
+        """
+        async with self._lock:
+            if server_path in self._pool:
+                session_info = self._pool[server_path]
+                if session_info.get("initialized"):
+                    session_info["last_used"] = time.time()
+                    logger.debug(f"复用现有 MCP 会话：{server_path}")
+                    return session_info["session"]
+
+            # 创建新会话
+            session_info = await _initialize_mcp_session(server_path)
+            session_info["last_used"] = time.time()
+            self._pool[server_path] = session_info
+            logger.info(f"创建新 MCP 会话：{server_path}")
+            return session_info["session"]
+
+    async def close_session(self, server_path: str) -> bool:
+        """关闭指定会话"""
+        async with self._lock:
+            return await self._close_session(server_path)
+
+    async def _close_session(self, server_path: str) -> bool:
+        """内部方法：关闭会话"""
+        session_info = self._pool.get(server_path)
+        if not session_info:
+            logger.warning(f"MCP 会话不存在：{server_path}")
+            return False
+
+        try:
+            logger.info(f"正在关闭 MCP 会话：{server_path}")
+
+            session = session_info.get("session")
+            context = session_info.get("context")
+
+            if session:
+                await session.__aexit__(None, None, None)
+            if context:
+                await context.__aexit__(None, None, None)
+
+            del self._pool[server_path]
+            logger.success(f"MCP 会话已关闭：{server_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"关闭 MCP 会话失败 {server_path}: {e}")
+            if server_path in self._pool:
+                del self._pool[server_path]
+            return False
+
+    async def close_all(self) -> int:
+        """关闭所有会话"""
+        async with self._lock:
+            server_paths = list(self._pool.keys())
+            closed_count = 0
+
+            for server_path in server_paths:
+                try:
+                    if await self._close_session(server_path):
+                        closed_count += 1
+                except Exception as e:
+                    logger.error(f"关闭会话时出错 {server_path}: {e}")
+
+            logger.info(f"共关闭 {closed_count} 个 MCP 会话")
+            return closed_count
+
+    def get_session_info(self, server_path: Optional[str] = None) -> Dict[str, Any]:
+        """获取会话信息"""
+        if server_path is None:
+            return {
+                path: {
+                    "initialized": info.get("initialized", False),
+                    "tools_count": len(info.get("tools", [])),
+                    "resources_count": len(info.get("resources", [])),
+                    "last_used": info.get("last_used", 0)
+                }
+                for path, info in self._pool.items()
+            }
+        else:
+            info = self._pool.get(server_path)
+            if info:
+                return {
+                    "initialized": info.get("initialized", False),
+                    "tools_count": len(info.get("tools", [])),
+                    "resources_count": len(info.get("resources", [])),
+                    "last_used": info.get("last_used", 0),
+                    "tools": [t.name for t in info.get("tools", [])],
+                    "resources": [r.uri for r in info.get("resources", [])]
+                }
+            return {}
+
+
+# 全局会话池实例
+_global_session_pool = MCPSessionPool()
+
+
+@asynccontextmanager
+async def mcp_session_context(server_path: str):
+    """
+    MCP 会话上下文管理器
+
+    Usage:
+        async with mcp_session_context("path/to/server.py") as session:
+            # 使用 session
+            pass
+    """
+    session = None
+    try:
+        session = await _global_session_pool.get_session(server_path)
+        yield session
+    except Exception as e:
+        logger.error(f"MCP 会话上下文中有异常：{e}")
+        raise
+    finally:
+        # 上下文管理器不负责关闭会话，会话由池管理
+        pass
 
 
 async def _initialize_mcp_session(server_path: str) -> Dict[str, Any]:
     """
     异步初始化 MCP 服务器会话
-    如果会话已存在则直接返回
+
+    注意：此函数不再负责加锁，调用者需自行管理并发
     """
-    global MCP_SESSION_POOL
+    # 验证文件存在
+    if not os.path.isfile(server_path):
+        raise FileNotFoundError(f"MCP 服务器脚本不存在：{server_path}")
 
-    with SESSION_LOCK:
-        # 检查会话是否已存在
-        if server_path in MCP_SESSION_POOL:
-            session_info = MCP_SESSION_POOL[server_path]
-            if session_info.get("initialized"):
-                logger.debug(f"MCP 会话已存在: {server_path}")
-                return session_info
+    # 确定执行命令
+    cmd = "python" if server_path.endswith(".py") else "node"
+    logger.debug(f"使用命令启动 MCP 服务器：{cmd} {server_path}")
 
-        # 会话不存在或未初始化,创建新会话
-        logger.info(f"正在初始化 MCP 会话: {server_path}")
+    try:
+        # 创建 stdio 客户端
+        params = StdioServerParameters(command=cmd, args=[server_path], env=None)
 
-        # 验证文件存在
-        if not os.path.isfile(server_path):
-            raise FileNotFoundError(f"MCP 服务器脚本不存在: {server_path}")
+        # 注意：__aenter__ 返回的是 (transport, session)
+        # transport 是 (reader, writer) 元组
+        stdio_ctx = stdio_client(params)
+        transport = await stdio_ctx.__aenter__()
+        reader, writer = transport
+        session = ClientSession(reader, writer)
 
-        # 确定执行命令
-        cmd = "python" if server_path.endswith(".py") else "node"
-        logger.debug(f"使用命令启动 MCP 服务器: {cmd} {server_path}")
+        # 初始化会话
+        await session.__aenter__()
+        await session.initialize()
 
-        try:
-            # 创建 stdio 客户端
-            params = StdioServerParameters(command=cmd, args=[server_path], env=None)
+        # 获取工具列表
+        tools_response = await session.list_tools()
+        tools = tools_response.tools
+        logger.info(f"MCP 服务器 {server_path} 共有 {len(tools)} 个工具")
 
-            # 注意: __aenter__ 返回的是 (transport, session)
-            # transport 是 (reader, writer) 元组
-            stdio_ctx = stdio_client(params)
-            transport = await stdio_ctx.__aenter__()
-            reader, writer = transport
-            session = ClientSession(reader, writer)
+        # 获取资源列表
+        resources_response = await session.list_resources()
+        resources = resources_response.resources
+        logger.info(f"MCP 服务器 {server_path} 共有 {len(resources)} 个资源")
 
-            # 初始化会话
-            await session.__aenter__()
-            await session.initialize()
+        # 保存到会话池
+        session_info = {
+            "session": session,
+            "transport": transport,
+            "context": stdio_ctx,
+            "tools": tools,
+            "resources": resources,
+            "initialized": True,
+            "server_path": server_path,
+            "last_used": time.time()
+        }
 
-            # 获取工具列表
-            tools_response = await session.list_tools()
-            tools = tools_response.tools
-            logger.info(f"MCP 服务器 {server_path} 共有 {len(tools)} 个工具")
+        logger.success(f"MCP 会话初始化成功：{server_path}")
+        return session_info
 
-            # 获取资源列表
-            resources_response = await session.list_resources()
-            resources = resources_response.resources
-            logger.info(f"MCP 服务器 {server_path} 共有 {len(resources)} 个资源")
-
-            # 保存到会话池
-            session_info = {
-                "session": session,
-                "transport": transport,
-                "context": stdio_ctx,
-                "tools": tools,
-                "resources": resources,
-                "initialized": True,
-                "server_path": server_path
-            }
-            MCP_SESSION_POOL[server_path] = session_info
-
-            logger.success(f"MCP 会话初始化成功: {server_path}")
-            return session_info
-
-        except Exception as e:
-            logger.error(f"MCP 会话初始化失败 {server_path}: {e}")
-            # 清理可能已创建的部分资源
-            if server_path in MCP_SESSION_POOL:
-                del MCP_SESSION_POOL[server_path]
-            raise
+    except Exception as e:
+        logger.error(f"MCP 会话初始化失败 {server_path}: {e}")
+        raise
 
 
 def _make_tool_wrapper(tool_name: str, server_path: str, input_schema: Dict[str, Any]):
@@ -99,35 +304,32 @@ def _make_tool_wrapper(tool_name: str, server_path: str, input_schema: Dict[str,
     """
     def sync_wrapper(**kwargs) -> str:
         try:
-            # 从会话池获取 session
-            with SESSION_LOCK:
-                session_info = MCP_SESSION_POOL.get(server_path)
+            # 使用全局事件循环执行异步调用
+            loop = get_or_create_event_loop()
 
-                if not session_info or not session_info.get("initialized"):
-                    error_msg = f"MCP 会话未初始化: {server_path}"
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
+            # 获取会话
+            session_info = None
+            if server_path in MCP_SESSION_POOL:
+                session_info = MCP_SESSION_POOL[server_path]
 
-                session = session_info["session"]
-
-            # 在新事件循环中执行异步调用
-            # 避免嵌套事件循环问题
-            loop = asyncio.new_event_loop()
-            try:
-                logger.trace(f"调用 MCP 工具: {tool_name} @ {server_path}, args={kwargs}")
-                result = loop.run_until_complete(session.call_tool(tool_name, kwargs))
-                content = result.content or ""
-                logger.debug(f"工具 {tool_name} 返回: {content[:100]}")
-                return content
-            except Exception as e:
-                error_msg = f"调用工具失败 {tool_name}: {str(e)}"
+            if not session_info or not session_info.get("initialized"):
+                error_msg = f"MCP 会话未初始化：{server_path}"
                 logger.error(error_msg)
-                raise
-            finally:
-                loop.close()
+                raise RuntimeError(error_msg)
+
+            session = session_info["session"]
+
+            logger.trace(f"调用 MCP 工具：{tool_name} @ {server_path}, args={kwargs}")
+
+            # 在事件循环中执行异步调用
+            result = loop.run_until_complete(session.call_tool(tool_name, kwargs))
+            content = result.content or ""
+            logger.debug(f"工具 {tool_name} 返回：{content[:100]}")
+            return content
 
         except Exception as e:
-            logger.error(f"执行工具 {tool_name} 出错: {e}")
+            error_msg = f"调用工具失败 {tool_name}: {str(e)}"
+            logger.error(error_msg)
             raise
 
     return sync_wrapper
@@ -140,34 +342,32 @@ def _make_resource_wrapper(resource_uri: str, server_path: str):
     """
     def sync_wrapper() -> str:
         try:
-            # 从会话池获取 session
-            with SESSION_LOCK:
-                session_info = MCP_SESSION_POOL.get(server_path)
+            # 使用全局事件循环执行异步调用
+            loop = get_or_create_event_loop()
 
-                if not session_info or not session_info.get("initialized"):
-                    error_msg = f"MCP 会话未初始化: {server_path}"
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
+            # 获取会话
+            session_info = None
+            if server_path in MCP_SESSION_POOL:
+                session_info = MCP_SESSION_POOL[server_path]
 
-                session = session_info["session"]
-
-            # 在新事件循环中执行
-            loop = asyncio.new_event_loop()
-            try:
-                logger.trace(f"读取 MCP 资源: {resource_uri} @ {server_path}")
-                result = loop.run_until_complete(session.read_resource(resource_uri))
-                content = result.contents or ""
-                logger.debug(f"资源 {resource_uri} 内容长度: {len(content)}")
-                return content
-            except Exception as e:
-                error_msg = f"读取资源失败 {resource_uri}: {str(e)}"
+            if not session_info or not session_info.get("initialized"):
+                error_msg = f"MCP 会话未初始化：{server_path}"
                 logger.error(error_msg)
-                raise
-            finally:
-                loop.close()
+                raise RuntimeError(error_msg)
+
+            session = session_info["session"]
+
+            logger.trace(f"读取 MCP 资源：{resource_uri} @ {server_path}")
+
+            # 在事件循环中执行异步调用
+            result = loop.run_until_complete(session.read_resource(resource_uri))
+            content = result.contents or ""
+            logger.debug(f"资源 {resource_uri} 内容长度：{len(content)}")
+            return content
 
         except Exception as e:
-            logger.error(f"访问资源 {resource_uri} 出错: {e}")
+            error_msg = f"读取资源失败 {resource_uri}: {str(e)}"
+            logger.error(error_msg)
             raise
 
     return sync_wrapper
@@ -200,7 +400,7 @@ async def register_mcp_tools_async(
     allowed_agents=None
 ) -> int:
     """
-    异步注册 MCP 服务器的所有工具为标准工具（非XML）
+    异步注册 MCP 服务器的所有工具为标准工具（非 XML）
 
     Args:
         server_path: MCP 服务器脚本路径
@@ -211,8 +411,10 @@ async def register_mcp_tools_async(
         int: 注册成功的工具数量
     """
     try:
-        # 初始化会话
-        session_info = await _initialize_mcp_session(server_path)
+        # 使用会话池获取或创建会话
+        async with SESSION_LOCK:
+            session_info = await _initialize_mcp_session(server_path)
+            MCP_SESSION_POOL[server_path] = session_info
 
         tools = session_info["tools"]
         resources = session_info["resources"]
@@ -222,10 +424,10 @@ async def register_mcp_tools_async(
         # 注册工具
         for tool in tools:
             tool_name = tool.name
-            desc = tool.description or f"MCP 工具: {tool_name}"
+            desc = tool.description or f"MCP 工具：{tool_name}"
             input_schema = tool.inputSchema
 
-            logger.debug(f"注册工具: {tool_name}")
+            logger.debug(f"注册工具：{tool_name}")
 
             # 转换 schema
             openai_schema = _convert_mcp_schema_to_openai(input_schema)
@@ -248,11 +450,11 @@ async def register_mcp_tools_async(
             for resource in resources:
                 # 从 URI 提取工具名 (移除特殊字符)
                 uri = resource.uri
-                # 创建资源工具名: 例如 file_test_txt
+                # 创建资源工具名：例如 file_test_txt
                 resource_name = f"read_{uri.split('://')[-1].replace('/', '_').replace('.', '_')}"
-                desc = f"读取 MCP 资源: {uri}"
+                desc = f"读取 MCP 资源：{uri}"
 
-                logger.debug(f"注册资源工具: {resource_name} ({uri})")
+                logger.debug(f"注册资源工具：{resource_name} ({uri})")
 
                 # 创建包装器并注册
                 wrapper = _make_resource_wrapper(uri, server_path)
@@ -285,7 +487,7 @@ def register_mcp_tools(
     allowed_agents=None
 ) -> int:
     """
-    同步入口: 注册 MCP 服务器的所有工具为标准工具
+    同步入口：注册 MCP 服务器的所有工具为标准工具
 
     Args:
         server_path: MCP 服务器脚本路径
@@ -300,7 +502,7 @@ def register_mcp_tools(
         3
     """
     if not os.path.isfile(server_path):
-        raise FileNotFoundError(f"MCP 服务器脚本不存在: {server_path}")
+        raise FileNotFoundError(f"MCP 服务器脚本不存在：{server_path}")
 
     # 运行异步注册
     return asyncio.run(
@@ -318,39 +520,7 @@ async def close_mcp_session(server_path: str) -> bool:
     Returns:
         bool: 是否成功关闭
     """
-    global MCP_SESSION_POOL
-
-    with SESSION_LOCK:
-        session_info = MCP_SESSION_POOL.get(server_path)
-
-        if not session_info:
-            logger.warning(f"MCP 会话不存在: {server_path}")
-            return False
-
-        try:
-            logger.info(f"正在关闭 MCP 会话: {server_path}")
-
-            # 关闭会话
-            session = session_info.get("session")
-            context = session_info.get("context")
-
-            if session:
-                await session.__aexit__(None, None, None)
-            if context:
-                await context.__aexit__(None, None, None)
-
-            # 从池中移除
-            del MCP_SESSION_POOL[server_path]
-
-            logger.success(f"MCP 会话已关闭: {server_path}")
-            return True
-
-        except Exception as e:
-            logger.error(f"关闭 MCP 会话失败 {server_path}: {e}")
-            # 即使失败也从池中移除,避免残留
-            if server_path in MCP_SESSION_POOL:
-                del MCP_SESSION_POOL[server_path]
-            return False
+    return await _global_session_pool.close_session(server_path)
 
 
 def close_mcp_session_sync(server_path: str) -> bool:
@@ -367,23 +537,7 @@ async def close_all_mcp_sessions() -> int:
     Returns:
         int: 成功关闭的会话数量
     """
-    global MCP_SESSION_POOL
-
-    closed_count = 0
-
-    # 复制键列表,避免在遍历时修改字典
-    server_paths = list(MCP_SESSION_POOL.keys())
-
-    for server_path in server_paths:
-        try:
-            if await close_mcp_session(server_path):
-                closed_count += 1
-        except Exception as e:
-            logger.error(f"关闭会话时出错 {server_path}: {e}")
-            continue
-
-    logger.info(f"共关闭 {closed_count} 个 MCP 会话")
-    return closed_count
+    return await _global_session_pool.close_all()
 
 
 def close_all_mcp_sessions_sync() -> int:
@@ -398,34 +552,31 @@ def get_session_info(server_path: Optional[str] = None) -> Dict[str, Any]:
     获取会话信息
 
     Args:
-        server_path: MCP 服务器脚本路径 (如果为 None,返回所有会话)
+        server_path: MCP 服务器脚本路径 (如果为 None，返回所有会话)
 
     Returns:
         Dict: 会话信息
     """
-    with SESSION_LOCK:
-        if server_path is None:
-            return {
-                path: {
-                    "initialized": info.get("initialized", False),
-                    "tools_count": len(info.get("tools", [])),
-                    "resources_count": len(info.get("resources", []))
-                }
-                for path, info in MCP_SESSION_POOL.items()
-            }
-        else:
-            info = MCP_SESSION_POOL.get(server_path)
-            if info:
-                return {
-                    "initialized": info.get("initialized", False),
-                    "tools_count": len(info.get("tools", [])),
-                    "resources_count": len(info.get("resources", [])),
-                    "tools": [t.name for t in info.get("tools", [])],
-                    "resources": [r.uri for r in info.get("resources", [])]
-                }
-            return {}
+    return _global_session_pool.get_session_info(server_path)
+
+
+def start_health_check(interval: int = 300) -> None:
+    """
+    启动健康检查任务
+
+    Args:
+        interval: 检查间隔（秒），默认 5 分钟
+    """
+    loop = get_or_create_event_loop()
+    loop.run_until_complete(_global_session_pool.start_health_check(interval))
+
+
+def stop_health_check() -> None:
+    """停止健康检查任务"""
+    loop = get_or_create_event_loop()
+    loop.run_until_complete(_global_session_pool.stop_health_check())
 
 
 # ==================== 兼容性接口 ====================
-# 保留旧接口名,向后兼容
+# 保留旧接口名，向后兼容
 connect_and_register = register_mcp_tools

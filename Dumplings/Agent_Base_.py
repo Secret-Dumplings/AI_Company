@@ -6,13 +6,12 @@ import re
 import sys
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
-from loguru import logger #配置日志
 
 try:
+    from .logging_config import logger  # 配置日志
     from .agent_tool import tool_registry
 except:
     raise ImportError("不可单独执行")
-logger.add("logs/app.log", rotation="500 MB", retention="10 days", compression="zip")
 
 
 class Agent(ABC):
@@ -425,10 +424,37 @@ class Agent(ABC):
 
             logger.info(f"从 {tool_source} 找到工具 {tool_name}")
             print(block)
-            self.pack(tool_name= tool_name, tool_parameter=tool_func)
 
-            # 执行工具
-            result = tool_func(block)
+            # 解析 XML 参数，与 Function Calling 模式统一
+            params = {}
+            for child in root.children:
+                if hasattr(child, 'name') and child.name:
+                    params[child.name] = child.text
+
+            self.pack(tool_name=tool_name, tool_parameter=params)
+
+            # 执行工具：根据函数签名决定传递 dict 还是解包参数
+            import inspect
+            sig = inspect.signature(tool_func)
+            param_count = len([p for p in sig.parameters.values()
+                             if p.default == inspect.Parameter.empty and p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)])
+
+            # 如果函数接受 **kwargs 或单个参数，传递整个 dict
+            # 否则解包参数
+            has_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+            if has_kwargs or param_count == 0:
+                result = tool_func(**params) if params else tool_func()
+            elif param_count == 1 and len(params) == 1:
+                # 单个参数函数，传递单个值
+                result = tool_func(list(params.values())[0])
+            else:
+                # 多参数函数，尝试解包
+                try:
+                    result = tool_func(**params)
+                except TypeError:
+                    # 如果解包失败，回退到传递整个 XML 块（向后兼容）
+                    result = tool_func(block)
+
             tool_results.append(result)
             tool_names.append(tool_name)
 
