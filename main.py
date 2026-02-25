@@ -63,6 +63,7 @@ class time_agent(Dumplings.BaseAgent):
 
 
 if __name__ == "__main__":
+    # Dumplings.register_agent(uuid.uuid4().hex,"scheduling_agent",)(scheduling_agent) # 通过函数的方法注册
     schedule_agent = Dumplings.agent_list["scheduling_agent"]
     # schedule_agent.conversation_with_tool("你好")
     schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
