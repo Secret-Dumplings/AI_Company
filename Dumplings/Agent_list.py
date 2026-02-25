@@ -9,9 +9,9 @@ def register_agent(uuid, name):
     def _decorator(cls):
         cls.uuid = uuid
         cls.name = name
-        cls = cls()
-        agent_list[uuid] = cls
-        agent_list[name] = cls
+        cls_instantiation = cls()
+        agent_list[uuid] = cls_instantiation
+        agent_list[name] = cls_instantiation
         return cls              # 原样返回，不影响类本身
     return _decorator
 

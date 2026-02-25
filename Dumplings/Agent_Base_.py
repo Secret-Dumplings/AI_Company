@@ -22,19 +22,6 @@ class Agent(ABC):
         model_name
         prompt
     """
-    # ---------------- 抽象属性 ----------------
-    @property
-    @abstractmethod
-    def api_key(self):        raise NotImplementedError
-    @property
-    @abstractmethod
-    def api_provider(self):   raise NotImplementedError
-    @property
-    @abstractmethod
-    def model_name(self):     raise NotImplementedError
-    @property
-    @abstractmethod
-    def prompt(self):         raise NotImplementedError
 
     # ---------------- 通用构造 ----------------
     def __init__(self):
@@ -461,7 +448,7 @@ class Agent(ABC):
         #如配置错误强制跳出避免堵塞
         if "<attempt_completion>" in full_content:
             self.pack("\n[系统] AI 已标记任务完成，程序退出。", tool_name="attempt_completion")
-            sys.exit(0)
+            # sys.exit(0)
 
         # 3. 若工具产生结果，继续对话
         if tool_results:
@@ -508,10 +495,12 @@ class Agent(ABC):
 
     def out(self, content):
         if content.get("tool_name"):
-            print("调用工具:", content.get("tool_name"),"参数", content.get("tool_parameter"))
+            print("调用工具:", content.get("tool_name"), "参数", content.get("tool_parameter"))
             return
         if not content.get("task"):
-            print(content.get("message"),end="")
+            message = content.get("message")
+            if message is not None:
+                print(message, end="")
         else:
             print()
 
@@ -603,5 +592,5 @@ class Agent(ABC):
 
         if report_content:
             print(report_content)
-        sys.exit(0)
+        # sys.exit(0)
 
