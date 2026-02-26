@@ -58,6 +58,7 @@ class time_agent(Dumplings.BaseAgent):
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
     model_name = "qwen3.5-plus"
     api_key = os.getenv("API_KEY")
+    fc_model = False
     def __init__(self):
         super().__init__()
 

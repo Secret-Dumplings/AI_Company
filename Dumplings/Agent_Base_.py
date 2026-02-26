@@ -6,6 +6,7 @@ import re
 import sys
 from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup
+import threading
 
 try:
     from .logging_config import logger  # 配置日志
@@ -14,22 +15,25 @@ except:
     raise ImportError("不可单独执行")
 
 
-class Agent(ABC):
+class Agent():
     """
-    抽象基类，所有具体 Dumplings 必须实现四个抽象属性：
+    所有具体 Dumplings 必须实现四个属性：
         api_key
         api_provider
         model_name
         prompt
     """
-
+    prompt = None
+    api_provider = None
+    model_name = None
+    api_key = None
+    fc_model = True # 现在xml工具调用改为下位支持，如有bug修复优先级降低
+    stream = True
     # ---------------- 通用构造 ----------------
     def __init__(self):
         self.uuid=self.__class__.uuid
         self.name=self.__class__.name
         self.stream_run=False
-        self.stream = True
-        from .agent_tool import tool_registry
         agent_name = getattr(self.__class__, 'name', None) or getattr(self.__class__, '__name__', None)
         if agent_name and self.uuid:
             tool_registry.register_agent_uuid(self.uuid, agent_name)
@@ -64,6 +68,9 @@ class Agent(ABC):
             for tool_name, tool_desc in builtin_tools.items():
                 if tool_name in tools_list and tool_name not in tools_info:
                     tools_prompt += f"- {tool_name}: {tool_desc}\n"
+            if not self.fc_model:
+                tools_prompt += "在使用xml格式的工具时应采用（无参数调用）<工具名></工具名>（含参数调用）<工具名><参数1>放入你想传入的内容</参数1>...</工具名>"
+
 
         prompt = self.prompt + tools_prompt + ", 你的uuid " + str(self.uuid)
         logger.info("prompt:"+str(prompt))
@@ -82,22 +89,24 @@ class Agent(ABC):
         elif self.os_name == "Darwin":
             self.os_main_folder = os.getenv("HOME")
 
-        if not self.Connectivity():
-            raise ConnectionError("请检查api_provider，model_name，api_key")
+        threading.Thread(target=self.Connectivity, daemon=True).start()
 
     # ---------------- 连通性测试 ----------------
     def Connectivity(self):
-        self.history.append({"role": "user", "content": "你好"})
         payload = {
             "model": self.model_name,
-            "messages": self.history,
+            "messages": [{"role": "user", "content": "你好"}],
             "stream": self.stream,
-            "stream_options": {"include_usage": True}
+            "stream_options": {"include_usage": True},
+            "max_tokens": 1
         }
         rsp = requests.post(self.api_provider,
                             headers=self.headers,
                             json=payload)
-        self.history = [{"role": "system", "content": self.prompt}]
+        if rsp.status_code == 200:
+            logger.info(f"{self.name} 连接正常")
+        else:
+            logger.error(f"{self.name} 连接测试未通过，可能存在配置错误")
         return rsp.status_code == 200
 
     # ---------------- 主对话函数 ----------------
@@ -130,10 +139,7 @@ class Agent(ABC):
             else:
                 self.history.append({"role": "user", "content": messages})
 
-        # 检查是否使用 Function Calling
-        fc_enabled = hasattr(self, 'fc_model') and self.fc_model
-
-        if fc_enabled:
+        if self.fc_model:
             # Function Calling 模式
             tools_schema = tool_registry.get_all_tools_schema(self.uuid)
 
@@ -237,7 +243,7 @@ class Agent(ABC):
                 delta = (chunk.get('choices') or [{}])[0].get('delta') or {}
 
                 # Function Calling: 处理 tool_calls
-                if fc_enabled:
+                if self.fc_model:
                     tool_calls = delta.get('tool_calls')
                     if tool_calls:
                         for call in tool_calls:
@@ -279,7 +285,7 @@ class Agent(ABC):
                 full_content = message.get('content', '')
 
                 # Function Calling: 处理 tool_calls
-                if fc_enabled:
+                if self.fc_model:
                     tool_calls_list = message.get('tool_calls', [])
 
                 if full_content:
@@ -297,7 +303,7 @@ class Agent(ABC):
         logger.info(full_content)
 
         # Function Calling: 执行工具调用
-        if fc_enabled and tool_calls_list:
+        if self.fc_model and tool_calls_list:
             logger.info(f"发现 Function Calling 工具调用: {tool_calls_list}")
 
             # 添加 assistant message with tool_calls
@@ -399,7 +405,7 @@ class Agent(ABC):
 
             # 优先级3: 都没有找到
             if tool_func is None:
-                available_tools = self._get_all_available_tools()
+                available_tools = self.get_all_available_tools()
                 tool_error = f"工具错误：找不到工具 '{tool_name}'。"
                 if available_tools:
                     tool_error += f" 你可以使用以下工具：{', '.join(available_tools)}"
@@ -504,6 +510,18 @@ class Agent(ABC):
         else:
             print()
 
+    # # ---------------- 内置工具 ----------------
+
+    def get_all_available_tools(self) -> list:
+        tools = []
+        tools_info = tool_registry.get_all_tools_info(self.uuid)
+        if tools_info:
+            tools.extend(tools_info.keys())
+        builtin_tools = ['ask_for_help', 'list_agents', 'attempt_completion']
+        for tool_name in builtin_tools:
+            if hasattr(self, tool_name) and callable(getattr(self, tool_name)):
+                tools.append(tool_name)
+        return tools
 
     def ask_for_help(self, **kwargs):
         """
