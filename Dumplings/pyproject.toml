@@ -1,5 +1,5 @@
 [project]
-name = "ai-company"
+name = "Dumplings"
 version = "0.1.0"
 description = "AI Company - 基于 LLM 的多智能体协作系统框架"
 readme = "README.md"
@@ -8,7 +8,6 @@ dependencies = [
     "beautifulsoup4>=4.14.2",
     "dashscope>=1.25.12",
     "dotenv>=0.9.9",
-    "dumplings",
     "fastapi>=0.117.1",
     "flask>=3.1.2",
     "flask-cors>=6.0.1",
@@ -28,14 +27,9 @@ dependencies = [
     "websockets>=15.0.1",
 ]
 
+[tool.setuptools]
+py-modules = ["Agent_Base_", "Agent_list", "agent_tool", "logging_config", "mcp_bridge"]
+
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 default = true
-
-[tool.uv.workspace]
-members = [
-    "Dumplings",
-]
-
-[tool.uv.sources]
-dumplings = { workspace = true }

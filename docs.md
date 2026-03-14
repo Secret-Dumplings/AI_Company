@@ -96,7 +96,7 @@ class MyAgent(Dumplings.BaseAgent):
 - [工具1]: [描述]
 - [工具2]: [描述]
 
-你的 UUID 是 {self.uuid}
+你的 UUID 是 <在__init__中可通过 self.uuid 访问>
 """
 
     # 2. API 配置
@@ -110,6 +110,8 @@ class MyAgent(Dumplings.BaseAgent):
     # 4. 初始化
     def __init__(self):
         super().__init__()
+        # 注意：如需在 prompt 中使用 UUID，请在 __init__ 中自行设置
+        # self.prompt = self.prompt.format(self=self)
 ```
 
 ### 带自定义属性的 Agent
@@ -480,7 +482,7 @@ class TimeAgent(Dumplings.BaseAgent):
 1. 使用 get_current_time 工具查询当前时间
 2. 使用 <ask_for_help> 请求其他 Agent 帮助
 
-你的 UUID 是 {self.uuid}
+你的 UUID 是 <Agent 的 UUID 会在初始化时自动添加>
 """
 
     api_provider = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
@@ -505,7 +507,7 @@ class SchedulerAgent(Dumplings.BaseAgent):
     prompt = """
 你是一个任务调度助手。你可以：
 1. 使用 search_info 工具搜索信息
-2. 使用 ask_for_help 请求 time_agent 帮助 (UUID: {time_agent_uuid})
+2. 使用 ask_for_help 请求 time_agent 帮助
 3. 使用 attempt_completion 标记任务完成
 
 可用的工具：
@@ -652,7 +654,7 @@ prompt = """
 ## 输出格式
 [说明输出格式]
 
-你的 UUID 是 {self.uuid}
+你的 UUID 是 <可在__init__中通过 self.uuid 访问>
 """
 ```
 

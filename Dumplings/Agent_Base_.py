@@ -30,7 +30,7 @@ class Agent():
     fc_model = True # 现在xml工具调用改为下位支持，如有bug修复优先级降低
     stream = True
     # ---------------- 通用构造 ----------------
-    def __init__(self):
+    def __init__(self,new_load=True):
         self.uuid=self.__class__.uuid
         self.name=self.__class__.name
         self.stream_run=False
@@ -51,7 +51,8 @@ class Agent():
         builtin_tools = {
             'ask_for_help': '请求其他Agent帮助，参数: agent_id(目标Agent的UUID或名称), message(请求内容)',
             'list_agents': '列出所有可用的Agent及其UUID和名称',
-            'attempt_completion': '标记任务完成并退出，参数: report_content(汇报内容，可选)'
+            'attempt_completion': '标记任务完成并退出，参数: report_content(汇报内容，可选)',
+            'reload': '重新加载你自己实现重新获取你可以使用的工具，你的新提示词'
         }
 
         for tool_name, tool_desc in builtin_tools.items():
@@ -75,7 +76,10 @@ class Agent():
         prompt = self.prompt + tools_prompt + ", 你的uuid " + str(self.uuid)
         logger.info("prompt:"+str(prompt))
         # print(prompt)
-        self.history = [{"role": "system", "content": prompt}]
+        if new_load:
+            self.history = [{"role": "system", "content": prompt}]
+        else:
+            self.history[0] = {"role": "system", "content": prompt}
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -230,6 +234,7 @@ class Agent():
         if self.stream:
             # 流式响应处理
             for line in rsp.iter_lines(decode_unicode=True):
+                logger.debug(line)
                 if not line or not line.startswith('data: '):
                     continue
                 data = line[6:]
@@ -281,6 +286,7 @@ class Agent():
             self.stream_run = False
             try:
                 response_json = rsp.json()
+                logger.debug(response_json)
                 message = response_json['choices'][0]['message']
                 full_content = message.get('content', '')
 
@@ -300,7 +306,7 @@ class Agent():
                 logger.error(f"非流式响应处理错误: {e}")
                 full_content = rsp.text
 
-        logger.info(full_content)
+        logger.debug(full_content)
 
         # Function Calling: 执行工具调用
         if self.fc_model and tool_calls_list:
@@ -333,7 +339,11 @@ class Agent():
                 if tool_func is None:
                     error_msg = f"找不到工具 '{tool_name}'"
                     logger.warning(error_msg)
-                    tool_results.append({"error": error_msg})
+                    tool_results.append({
+                        'tool_call_id': tool_id,
+                        'name': tool_name,
+                        'content': error_msg
+                    })
                     continue
 
                 # 调用工具（解析 arguments 为 dict）
@@ -447,6 +457,8 @@ class Agent():
                 except TypeError:
                     # 如果解包失败，回退到传递整个 XML 块（向后兼容）
                     result = tool_func(block)
+            if not result:
+                result = f"no return for the tool{tool_name}"
 
             tool_results.append(result)
             tool_names.append(tool_name)
@@ -472,7 +484,7 @@ class Agent():
             logger.info(
                 str(self.history)
             )
-            return self.history[-1]
+            return self.history[-1].get("content")
         return full_content
 
     def pack(self, message=None,tool_model=False, tool_name=None, tool_parameter=None, finish_task=False, other=False):
@@ -510,7 +522,12 @@ class Agent():
         else:
             print()
 
-    # # ---------------- 内置工具 ----------------
+
+    # ---------------- 内置工具 ----------------
+
+    def reload(self):
+        self.__init__(new_load=False)
+        return "successfully reloaded 请查看最新更新提示词"
 
     def get_all_available_tools(self) -> list:
         tools = []
@@ -549,15 +566,15 @@ class Agent():
                 message = message_tag.text.strip()
 
         if agent_id is None:
-            return {"role": "system", "content": "<ask_for_help> 缺少 agent_id 字段"}
+            return "<ask_for_help> 缺少 agent_id 字段"
         if message is None:
-            return {"role": "system", "content": "<ask_for_help> 缺少 message 字段"}
+            return "<ask_for_help> 缺少 message 字段"
 
         try:
             from Dumplings import agent_list
             target_cls = agent_list[agent_id]
         except KeyError as e:
-            return {"role": "system", "content": f"未找到 uuid/别名 {e}"}
+            return f"未找到 uuid/别名 {e}"
 
         target_ins = target_cls
         reply = target_ins.conversation_with_tool(message)
@@ -610,5 +627,6 @@ class Agent():
 
         if report_content:
             print(report_content)
-        # sys.exit(0)
+        # 返回完成报告，作为 tool 响应内容
+        return report_content if report_content else "任务已完成"
 

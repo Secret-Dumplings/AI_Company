@@ -37,9 +37,10 @@ import Dumplings
         "required": []
     }
 )
-def get_time():
+def get_time(**kwargs):
     """获取当前时间"""
-    return "11:03"
+    from datetime import datetime
+    return datetime.now().strftime("%H:%M:%S")
 ```
 
 ### 工具函数签名
@@ -49,8 +50,10 @@ def get_time():
 ```python
 # 无参数工具
 @Dumplings.tool_registry.register_tool(name="get_time")
-def get_time():
-    return "11:03"
+def get_time(**kwargs):
+    """获取当前时间"""
+    from datetime import datetime
+    return datetime.now().strftime("%H:%M:%S")
 
 # 单参数工具
 @Dumplings.tool_registry.register_tool(name="search")
