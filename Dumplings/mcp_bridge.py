@@ -17,7 +17,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from contextlib import asynccontextmanager
 from .agent_tool import tool_registry
-from loguru import logger
+from .logging_config import logger
 
 
 # ==================== 全局会话池 ====================

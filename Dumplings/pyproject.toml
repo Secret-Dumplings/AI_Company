@@ -6,25 +6,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4>=4.14.2",
-    "dashscope>=1.25.12",
-    "dotenv>=0.9.9",
-    "fastapi>=0.117.1",
-    "flask>=3.1.2",
-    "flask-cors>=6.0.1",
     "loguru>=0.7.3",
     "lxml>=6.0.2",
     "mcp>=1.14.1",
-    "openai>=2.14.0",
-    "opencv-python>=4.12.0.88",
-    "pyaudio>=0.2.14",
-    "pyautogui>=0.9.54",
-    "python-qt5>=0.1.10",
-    "python-socketio[asyncio-server]>=5.11",
     "requests>=2.32.5",
-    "streamlit>=1.51.0",
-    "uvicorn>=0.36.0",
-    "websocket-client==1.8.0",
-    "websockets>=15.0.1",
 ]
 
 [tool.setuptools]
