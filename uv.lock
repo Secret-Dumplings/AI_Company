@@ -583,49 +583,19 @@ version = "0.1.0"
 source = { editable = "Dumplings" }
 dependencies = [
     { name = "beautifulsoup4" },
-    { name = "dashscope" },
-    { name = "dotenv" },
-    { name = "fastapi" },
-    { name = "flask" },
-    { name = "flask-cors" },
     { name = "loguru" },
     { name = "lxml" },
     { name = "mcp" },
-    { name = "openai" },
-    { name = "opencv-python" },
-    { name = "pyaudio" },
-    { name = "pyautogui" },
-    { name = "python-qt5" },
-    { name = "python-socketio" },
     { name = "requests" },
-    { name = "streamlit" },
-    { name = "uvicorn" },
-    { name = "websocket-client" },
-    { name = "websockets" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.14.2" },
-    { name = "dashscope", specifier = ">=1.25.12" },
-    { name = "dotenv", specifier = ">=0.9.9" },
-    { name = "fastapi", specifier = ">=0.117.1" },
-    { name = "flask", specifier = ">=3.1.2" },
-    { name = "flask-cors", specifier = ">=6.0.1" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "mcp", specifier = ">=1.14.1" },
-    { name = "openai", specifier = ">=2.14.0" },
-    { name = "opencv-python", specifier = ">=4.12.0.88" },
-    { name = "pyaudio", specifier = ">=0.2.14" },
-    { name = "pyautogui", specifier = ">=0.9.54" },
-    { name = "python-qt5", specifier = ">=0.1.10" },
-    { name = "python-socketio", extras = ["asyncio-server"], specifier = ">=5.11" },
     { name = "requests", specifier = ">=2.32.5" },
-    { name = "streamlit", specifier = ">=1.51.0" },
-    { name = "uvicorn", specifier = ">=0.36.0" },
-    { name = "websocket-client", specifier = "==1.8.0" },
-    { name = "websockets", specifier = ">=15.0.1" },
 ]
 
 [[package]]
