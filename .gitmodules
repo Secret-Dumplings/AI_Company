@@ -1,0 +1,3 @@
+[submodule "Dumplings"]
+	path = Dumplings
+	url = https://github.com/Secret-Dumplings/Dumplings.git
