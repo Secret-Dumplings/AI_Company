@@ -39,6 +39,25 @@ class scheduling_agent(Dumplings.BaseAgent):
     fc_model = True
     def __init__(self):
         super().__init__()
+        # 注册工具调用钩子，演示钩子功能
+        self.register_tool_hook(self.tool_call_logger)
+
+    def tool_call_logger(self, event_type, tool_name, tool_args, tool_result=None, task_id=None):
+        """
+        工具调用钩子 - 记录所有工具调用事件
+        参数:
+            event_type: 'before' | 'after' | 'error'
+            tool_name: 工具名称
+            tool_args: 工具参数
+            tool_result: 工具执行结果 (after/error 事件时存在)
+            task_id: 当前任务 ID
+        """
+        if event_type == 'before':
+            print(f"\n[钩子-before] 任务 {task_id[:8]}... 即将调用工具：{tool_name}, 参数：{tool_args}")
+        elif event_type == 'after':
+            print(f"\n[钩子-after] 任务 {task_id[:8]}... 工具 {tool_name} 执行完成，结果：{tool_result}")
+        elif event_type == 'error':
+            print(f"\n[钩子-error] 任务 {task_id[:8]}... 工具 {tool_name} 执行失败：{tool_result}")
 
     def out(self, content):
         #你可以通过劫持out获取内容
