@@ -8,7 +8,7 @@ dependencies = [
     "beautifulsoup4>=4.14.2",
     "dashscope>=1.25.12",
     "dotenv>=0.9.9",
-    "dumplings",
+    "dumplingsAI",
     "fastapi>=0.117.1",
     "flask>=3.1.2",
     "flask-cors>=6.0.1",
@@ -38,4 +38,4 @@ members = [
 ]
 
 [tool.uv.sources]
-dumplings = { workspace = true }
+dumplingsAI = { workspace = true }
