@@ -131,12 +131,12 @@ API_KEY=your_llm_api_key_here
 Agents inherit from `BaseAgent` base class and are registered using the `@register_agent` decorator.
 
 ```python
-import Dumplings
+import dumplingsAI
 import os
 import uuid
 
-@Dumplings.register_agent(uuid.uuid4().hex, "my_agent")
-class MyAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent(uuid.uuid4().hex, "my_agent")
+class MyAgent(dumplingsAI.BaseAgent):
     """Agent role description / 智能体角色描述"""
 
     # System prompt / 系统提示词
@@ -163,7 +163,7 @@ class MyAgent(Dumplings.BaseAgent):
 Tools are registered via the `@tool_registry.register_tool` decorator, controlling which agents can use them.
 
 ```python
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["my_agent", "other_agent"],  # List of agents allowed to use / 允许使用的智能体列表
     name="search_web",                           # Tool name / 工具名称
     description="Search internet information / 搜索互联网信息",  # Tool description / 工具描述
@@ -203,8 +203,8 @@ uv run main.py
 ### 5. Using Agents / 使用智能体
 
 ```python
-import Dumplings
-from Dumplings import agent_list
+import dumplingsAI
+from dumplingsAI import agent_list
 
 # Get agent by name / 通过名称获取智能体
 agent = agent_list["my_agent"]
@@ -285,13 +285,13 @@ The following is a complete example showing how to create two agents and enable 
 import sys
 from dotenv import load_dotenv
 import os
-import Dumplings
+import dumplingsAI
 import uuid
 
 load_dotenv()
 
 # 1. Register tool - Get current time / 注册工具 - 获取当前时间
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["time_agent"],  # Only time_agent can use / 只有 time_agent 可以使用
     name="get_time",
     description="Get current time / 获取当前时间",
@@ -307,8 +307,8 @@ def get_time(xml=None):
     return datetime.now().strftime("%H:%M:%S")
 
 # 2. Create time agent / 创建时间智能体
-@Dumplings.register_agent(uuid.uuid4().hex, "time_agent")
-class TimeAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent(uuid.uuid4().hex, "time_agent")
+class TimeAgent(dumplingsAI.BaseAgent):
     """Time management agent / 时间管理智能体"""
 
     prompt = "You are a time management assistant, you can query the current time. You have a tool called get_time that you can call. / 你是一个时间管理助手，可以查询当前时间。你有一个工具叫 get_time 可以调用。"
@@ -320,8 +320,8 @@ class TimeAgent(Dumplings.BaseAgent):
         super().__init__()
 
 # 3. Create scheduler agent / 创建调度智能体
-@Dumplings.register_agent(uuid.uuid4().hex, "scheduler_agent")
-class SchedulerAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduler_agent")
+class SchedulerAgent(dumplingsAI.BaseAgent):
     """Scheduler agent that can request help from other agents / 调度智能体，可以请求其他智能体帮助"""
 
     prompt = "You are a task scheduler assistant. You can request help from other agents using the <ask_for_help> tag. / 你是一个任务调度助手。你可以通过 <ask_for_help> 标签请求其他智能体帮助。"
@@ -336,7 +336,7 @@ class SchedulerAgent(Dumplings.BaseAgent):
 # 4. Run conversation / 运行对话
 if __name__ == "__main__":
     # Get scheduler agent / 获取调度智能体
-    scheduler = Dumplings.agent_list["scheduler_agent"]
+    scheduler = dumplingsAI.agent_list["scheduler_agent"]
 
     # Initiate conversation, request to query current time / 发起对话，请求查询当前时间
     scheduler.conversation_with_tool("Please help me query the current time / 请帮我查询当前时间")

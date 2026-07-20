@@ -3,7 +3,7 @@
 Anthropic 协议 Agent 示例
 
 此示例展示：
-1. 如何用 Dumplings.AnthropicAgent 走 Anthropic Messages API
+1. 如何用 dumplingsAI.AnthropicAgent 走 Anthropic Messages API
 2. 注册工具 + 让 Agent 自动调用
 3. 与 BaseAgent 完全一致的使用体验（ask_for_help / list_agents / attempt_completion 都通用）
 
@@ -18,12 +18,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import uuid
 
-import Dumplings
-from Dumplings.anthropic_agent import AnthropicAgent
+import dumplingsAI
+from dumplingsAI.anthropic_agent import AnthropicAgent
 
 
 # 1. 注册工具 —— 与 BaseAgent 共用同一套 tool_registry
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["weather_agent"],
     description="查询某城市的天气信息，返回一句话预报",
     name="get_weather",
@@ -40,7 +40,7 @@ def get_weather(city: str) -> str:
     return f"{city}今天晴，温度 25°C，湿度 40%"
 
 
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["weather_agent"],
     description="把摄氏温度转换为华氏温度",
     name="celsius_to_fahrenheit",
@@ -58,7 +58,7 @@ def celsius_to_fahrenheit(c: float) -> str:
 
 
 # 2. 注册 Anthropic 协议 Agent
-@Dumplings.register_agent(uuid.uuid4().hex, "weather_agent",
+@dumplingsAI.register_agent(uuid.uuid4().hex, "weather_agent",
                           "天气查询与温度换算助手，调用 get_weather / celsius_to_fahrenheit")
 class WeatherAgent(AnthropicAgent):
     """
@@ -104,12 +104,12 @@ if __name__ == "__main__":
     if not os.getenv("ANTHROPIC_API_KEY"):
         print("未设置 ANTHROPIC_API_KEY，跳过实际对话；只演示装饰器和收集器。")
         # 即便不联网，也能 inspect 已收集到的工具 schema
-        tool_registry = Dumplings.tool_registry
-        for s in tool_registry.collect_builtin_tools(Dumplings.agent_list["weather_agent"]):
+        tool_registry = dumplingsAI.tool_registry
+        for s in tool_registry.collect_builtin_tools(dumplingsAI.agent_list["weather_agent"]):
             fn = s["function"]
             print(f"  - {fn['name']}: {fn['description']}")
         sys.exit(0)
 
-    agent = Dumplings.agent_list["weather_agent"]
+    agent = dumplingsAI.agent_list["weather_agent"]
     print("=== Anthropic Agent 示例 ===\n")
     agent.conversation_with_tool("帮我查一下北京今天的天气，再把温度换成华氏度。")

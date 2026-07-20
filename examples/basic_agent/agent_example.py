@@ -13,12 +13,12 @@ import os
 # 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import Dumplings
+import dumplingsAI
 import uuid
 
 
 # 1. 注册工具
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["time_agent_uuid", "time_agent"],
     name="get_time",
     description="获取当前时间",
@@ -34,8 +34,8 @@ def get_time():
 
 
 # 2. 创建调度 Agent
-@Dumplings.register_agent(uuid.uuid4().hex, "scheduling_agent")
-class SchedulingAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduling_agent")
+class SchedulingAgent(dumplingsAI.BaseAgent):
     """
     调度 Agent 示例
 
@@ -65,8 +65,8 @@ class SchedulingAgent(Dumplings.BaseAgent):
 
 
 # 3. 创建时间 Agent
-@Dumplings.register_agent("time_agent_uuid", "time_agent")
-class TimeAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent("time_agent_uuid", "time_agent")
+class TimeAgent(dumplingsAI.BaseAgent):
     """
     时间 Agent 示例
 
@@ -86,7 +86,7 @@ class TimeAgent(Dumplings.BaseAgent):
 # 4. 运行示例
 if __name__ == "__main__":
     # 获取调度 Agent 实例
-    schedule_agent = Dumplings.agent_list["scheduling_agent"]
+    schedule_agent = dumplingsAI.agent_list["scheduling_agent"]
 
     # 运行对话
     print("=== 基础 Agent 示例 ===")

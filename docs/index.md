@@ -1,4 +1,4 @@
-# Dumplings 库文档
+# dumplingsAI 库文档
 
 ## 快速开始
 
@@ -20,14 +20,14 @@ API_KEY=your_api_key_here
 
 ## 工具注册
 
-Dumplings 支持两种工具调用方式：**Function Calling** 和 **XML**。
+dumplingsAI 支持两种工具调用方式：**Function Calling** 和 **XML**。
 
 ### 注册工具
 
 ```python
-import Dumplings
+import dumplingsAI
 
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["my_agent"],
     name="get_time",
     description="获取当前时间",
@@ -49,19 +49,19 @@ def get_time(**kwargs):
 
 ```python
 # 无参数工具
-@Dumplings.tool_registry.register_tool(name="get_time")
+@dumplingsAI.tool_registry.register_tool(name="get_time")
 def get_time(**kwargs):
     """获取当前时间"""
     from datetime import datetime
     return datetime.now().strftime("%H:%M:%S")
 
 # 单参数工具
-@Dumplings.tool_registry.register_tool(name="search")
+@dumplingsAI.tool_registry.register_tool(name="search")
 def search(query: str):
     return f"搜索结果：{query}"
 
 # 多参数工具
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     name="calculate",
     parameters={
         "type": "object",
@@ -86,11 +86,11 @@ def calculate(a: float, b: float, op: str):
 ### 基本 Agent
 
 ```python
-import Dumplings
+import dumplingsAI
 import os
 
-@Dumplings.register_agent("unique_uuid", "agent_name")
-class MyAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent("unique_uuid", "agent_name")
+class MyAgent(dumplingsAI.BaseAgent):
     prompt = "你是一个有用的助手"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name = "qwen3.5-plus"
@@ -103,8 +103,8 @@ class MyAgent(Dumplings.BaseAgent):
 ### 启用 Function Calling
 
 ```python
-@Dumplings.register_agent("uuid", "fc_agent")
-class FCAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent("uuid", "fc_agent")
+class FCAgent(dumplingsAI.BaseAgent):
     prompt = "你是一个支持工具调用的 Agent"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name = "qwen3.5-plus"
@@ -115,8 +115,8 @@ class FCAgent(Dumplings.BaseAgent):
 ### 自定义输出
 
 ```python
-@Dumplings.register_agent("uuid", "custom_agent")
-class CustomAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent("uuid", "custom_agent")
+class CustomAgent(dumplingsAI.BaseAgent):
     prompt = "你是一个自定义输出的 Agent"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name = "qwen3.5-plus"
@@ -164,7 +164,7 @@ AI 也可以生成 XML 格式的请求：
 ### 手动调用
 
 ```python
-from Dumplings import agent_list
+from dumplingsAI import agent_list
 
 # 获取目标 Agent
 time_agent = agent_list["time_agent"]
@@ -180,7 +180,7 @@ response = time_agent.conversation_with_tool("现在几点了？")
 ### 获取 Agent 实例
 
 ```python
-from Dumplings import agent_list
+from dumplingsAI import agent_list
 
 # 通过 UUID 获取
 agent = agent_list["unique_uuid"]
@@ -212,7 +212,7 @@ agent.conversation_with_tool(
 ### 注册 MCP 服务器工具
 
 ```python
-from Dumplings.mcp_bridge import register_mcp_tools
+from dumplingsAI.mcp_bridge import register_mcp_tools
 
 # 注册 MCP 服务器的所有工具
 count = register_mcp_tools("path/to/mcp_server.py")
@@ -222,7 +222,7 @@ print(f"注册了 {count} 个工具")
 ### 使用会话池
 
 ```python
-from Dumplings.mcp_bridge import _global_session_pool, start_health_check
+from dumplingsAI.mcp_bridge import _global_session_pool, start_health_check
 
 # 启动健康检查（每 5 分钟检查一次）
 start_health_check(interval=300)
@@ -242,7 +242,7 @@ _global_session_pool.close_all()
 ### 统一日志模块
 
 ```python
-from Dumplings.logging_config import setup_logging, get_logger
+from dumplingsAI.logging_config import setup_logging, get_logger
 
 # 自定义日志配置
 setup_logging(
@@ -271,7 +271,7 @@ export LOGURU_DISABLED=1
 
 ## API 参考
 
-### Dumplings.BaseAgent
+### dumplingsAI.BaseAgent
 
 基类，所有 Agent 必须继承此类。
 
@@ -287,7 +287,7 @@ export LOGURU_DISABLED=1
 - `list_agents()` - 列出所有可用 Agent
 - `attempt_completion(report_content)` - 标记任务完成
 
-### Dumplings.register_agent(uuid, name)
+### dumplingsAI.register_agent(uuid, name)
 
 Agent 注册装饰器。
 
@@ -295,7 +295,7 @@ Agent 注册装饰器。
 - `uuid` - Agent 的唯一标识符
 - `name` - Agent 的人类可读名称
 
-### Dumplings.tool_registry.register_tool(...)
+### dumplingsAI.tool_registry.register_tool(...)
 
 工具注册装饰器。
 
@@ -321,7 +321,7 @@ agent.conversation_with_tool("请请求时间 Agent 帮助")
 或手动调用：
 
 ```python
-from Dumplings import agent_list
+from dumplingsAI import agent_list
 target = agent_list["other_agent"]
 response = target.conversation_with_tool("你好")
 ```
@@ -331,7 +331,7 @@ response = target.conversation_with_tool("你好")
 A: 使用 `register_tool` 装饰器：
 
 ```python
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     name="my_tool",
     description="我的工具"
 )
@@ -344,7 +344,7 @@ def my_tool(param1: str, param2: int):
 A: 使用 `register_mcp_tools` 函数：
 
 ```python
-from Dumplings.mcp_bridge import register_mcp_tools
+from dumplingsAI.mcp_bridge import register_mcp_tools
 register_mcp_tools("mcp_server.py")
 ```
 
@@ -353,7 +353,7 @@ register_mcp_tools("mcp_server.py")
 A: 重写 `out` 方法或使用日志：
 
 ```python
-from Dumplings.logging_config import logger
+from dumplingsAI.logging_config import logger
 
 try:
     agent.conversation_with_tool("...")

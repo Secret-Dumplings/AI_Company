@@ -12,12 +12,12 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import Dumplings
+import dumplingsAI
 import uuid
 
 
 # 工具：获取时间（支持 Function Calling 和 XML 两种方式）
-@Dumplings.tool_registry.register_tool(
+@dumplingsAI.tool_registry.register_tool(
     allowed_agents=["time_agent", "assistant_agent"],
     name="get_time",
     description="获取当前时间",
@@ -39,8 +39,8 @@ def get_time():
 
 
 # Agent 1: 时间 Agent
-@Dumplings.register_agent("time_agent_uuid", "time_agent")
-class TimeAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent("time_agent_uuid", "time_agent")
+class TimeAgent(dumplingsAI.BaseAgent):
     """
     时间 Agent - 负责提供时间查询服务
 
@@ -57,8 +57,8 @@ class TimeAgent(Dumplings.BaseAgent):
 
 
 # Agent 2: 助手 Agent（支持 ask_for_help）
-@Dumplings.register_agent("assistant_agent_uuid", "assistant_agent")
-class AssistantAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent("assistant_agent_uuid", "assistant_agent")
+class AssistantAgent(dumplingsAI.BaseAgent):
     """
     助手 Agent - 负责协调其他 Agent
 
@@ -93,8 +93,8 @@ class AssistantAgent(Dumplings.BaseAgent):
 
 
 # Agent 3: 调度 Agent（协调多个 Agent）
-@Dumplings.register_agent(str(uuid.uuid4()), "scheduling_agent")
-class SchedulingAgent(Dumplings.BaseAgent):
+@dumplingsAI.register_agent(str(uuid.uuid4()), "scheduling_agent")
+class SchedulingAgent(dumplingsAI.BaseAgent):
     """
     调度 Agent - 负责协调多个 Agent 完成任务
     """
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     print("=== 多 Agent 协作示例 ===\n")
 
     # 获取助手 Agent 实例
-    assistant = Dumplings.agent_list["assistant_agent"]
+    assistant = dumplingsAI.agent_list["assistant_agent"]
 
     # 示例 1: 请求时间 Agent 查询时间
     print("--- 示例 1: 查询时间 ---")
