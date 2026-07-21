@@ -30,13 +30,14 @@ def get_time(xml=None):
 
 # @dumplingsAI.register_agent(uuid.uuid4().hex, "scheduling_agent2") 可通过叠加装饰器创建多实例
 @dumplingsAI.register_agent(uuid.uuid4().hex, "scheduling_agent","用于调用其他ai分类需求，回答简易问题，总结subagent的返回")
-class scheduling_agent(dumplingsAI.BaseAgent):
+class scheduling_agent(dumplingsAI.Agent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签直接退出对话（你不可再次获得任何信息）， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"""
     prompt = f"你是一个名为汤圆Agent的AGI"
-    api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    api_provider = "https://api.minimaxi.com/anthropic"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = True
+    property=
     def __init__(self):
         super().__init__()
         # 注册工具调用钩子，演示钩子功能
@@ -75,7 +76,7 @@ class time_agent(dumplingsAI.BaseAgent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你还有get_time可以查询时间（直接<get_time></get_time>即可）"""
     prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者， 你可以通过工具获取时间"
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = False
     def __init__(self):

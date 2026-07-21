@@ -70,8 +70,8 @@ class WeatherAgent(AnthropicAgent):
         "当用户希望把温度换成华氏时，调用 celsius_to_fahrenheit。"
         "完成后用 attempt_completion 汇报。"
     )
-    api_provider = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
-    model_name = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
+    api_provider = os.getenv("ANTHROPIC_BASE_URL")
+    model_name = os.getenv("ANTHROPIC_MODEL")
     api_key = os.getenv("ANTHROPIC_API_KEY")
     max_tokens = 1024
 

@@ -617,7 +617,7 @@ def get_weather(city: str) -> str:
 class WeatherAgent(dumplingsAI.anthropic_agent.AnthropicAgent):
     prompt = "你是天气助手，调用 get_weather 拿天气；用 attempt_completion 汇报。"
     api_provider = "https://api.anthropic.com"
-    model_name   = "claude-3-5-sonnet-latest"
+    model_name   = os.getenv("ANTHROPIC_MODEL")
     api_key      = os.getenv("ANTHROPIC_API_KEY")
 
 agent = dumplingsAI.agent_list["weather_agent"]
@@ -680,7 +680,7 @@ class MyAgent(dumplingsAI.anthropic_agent.AnthropicAgent):
 class Scheduler(dumplingsAI.BaseAgent):           # OpenAI 协议
     prompt = "..."
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name   = "qwen3.5-plus"
+    model_name   = os.getenv("OPENAI_MODEL")
     api_key      = os.getenv("API_KEY")
     fc_model     = True
 

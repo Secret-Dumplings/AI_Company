@@ -49,7 +49,7 @@ class TimeAgent(dumplingsAI.BaseAgent):
     """
     prompt = "你是一个名为汤圆 Agent 的子 Agent，名为时间管理者。你负责提供时间查询服务，当用户询问时间时，请使用 get_time 工具。"
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
 
     def __init__(self):
@@ -73,7 +73,7 @@ class AssistantAgent(dumplingsAI.BaseAgent):
 - XML 方式：<ask_for_help><agent_id>time_agent</agent_id><message>请查询时间</message></ask_for_help>
 """
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = True  # 启用 Function Calling 模式
 
@@ -107,7 +107,7 @@ class SchedulingAgent(dumplingsAI.BaseAgent):
 你可以使用 ask_for_help 请求其他 Agent 帮助。
 """
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = True
 

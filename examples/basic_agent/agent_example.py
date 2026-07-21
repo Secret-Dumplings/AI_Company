@@ -46,7 +46,7 @@ class SchedulingAgent(dumplingsAI.BaseAgent):
     """
     prompt = "你是一个名为汤圆 Agent 的 AGI"
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = True  # 启用 Function Calling 模式
 
@@ -76,7 +76,7 @@ class TimeAgent(dumplingsAI.BaseAgent):
     """
     prompt = "你是一个名为汤圆 Agent 的 AGI 的子 agent 名为时间管理者，你可以通过工具获取时间"
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
 
     def __init__(self):

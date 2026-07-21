@@ -93,7 +93,7 @@ import os
 class MyAgent(dumplingsAI.BaseAgent):
     prompt = "你是一个有用的助手"
     api_provider = "https://api.example.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
 
     def __init__(self):
@@ -107,7 +107,7 @@ class MyAgent(dumplingsAI.BaseAgent):
 class FCAgent(dumplingsAI.BaseAgent):
     prompt = "你是一个支持工具调用的 Agent"
     api_provider = "https://api.example.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = True  # 启用 Function Calling 模式
 ```
@@ -119,7 +119,7 @@ class FCAgent(dumplingsAI.BaseAgent):
 class CustomAgent(dumplingsAI.BaseAgent):
     prompt = "你是一个自定义输出的 Agent"
     api_provider = "https://api.example.com/v1/chat/completions"
-    model_name = "qwen3.5-plus"
+    model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
 
     def out(self, content):
