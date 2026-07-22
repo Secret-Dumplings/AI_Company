@@ -37,7 +37,7 @@ class scheduling_agent(dumplingsAI.Agent):
     model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
     fc_model = True
-    property=
+    protocol="anthropic"
     def __init__(self):
         super().__init__()
         # 注册工具调用钩子，演示钩子功能
@@ -72,13 +72,14 @@ class scheduling_agent(dumplingsAI.Agent):
 
 
 @dumplingsAI.register_agent("8841cd45eef54217bc8122cafebe5fd6", "time_agent","用于获取当前时间")
-class time_agent(dumplingsAI.BaseAgent):
+class time_agent(dumplingsAI.Agent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你还有get_time可以查询时间（直接<get_time></get_time>即可）"""
     prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者， 你可以通过工具获取时间"
-    api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
+    api_provider = "https://api.minimaxi.com/anthropic"
     model_name = os.getenv("OPENAI_MODEL")
     api_key = os.getenv("API_KEY")
-    fc_model = False
+    fc_model = True
+    protocol="anthropic"
     def __init__(self):
         super().__init__()
 

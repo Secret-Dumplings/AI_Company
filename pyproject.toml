@@ -39,3 +39,8 @@ members = [
 
 [tool.uv.sources]
 dumplingsAI = { workspace = true }
+
+[tool.pytest.ini_options]
+# 让 tests/ 能 import 根目录的 api/ 包
+pythonpath = ["."]
+testpaths = ["tests"]
