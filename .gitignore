@@ -8,3 +8,9 @@ logs/app.log
 /logs/app.log
 /(废弃)web_ui/logs/app.log
 nul
+
+# web-ui 前端
+web-ui/node_modules/
+web-ui/dist/
+web-ui/.vite/
+web-ui/.env.local
