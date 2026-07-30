@@ -588,7 +588,7 @@ wheels = [
 
 [[package]]
 name = "dumplingsai"
-version = "0.2.2"
+version = "0.3.1"
 source = { editable = "Dumplings" }
 dependencies = [
     { name = "beautifulsoup4" },
