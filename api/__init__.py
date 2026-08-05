@@ -1,5 +1,5 @@
 """
-AI Company - 把 dumplingsAI 暴露为 HTTP API 的 FastAPI 扩展层。
+AI Company - 把 tangyuanAI 暴露为 HTTP API 的 FastAPI 扩展层。
 
 启动方式::
 
@@ -17,7 +17,7 @@ AI Company - 把 dumplingsAI 暴露为 HTTP API 的 FastAPI 扩展层。
 
 设计原则：
 
-1. **零侵入**：dumplingsAI 子包完全不变；本目录是 *纯扩展*，依赖 dumplingsAI 但不修改它。
+1. **零侵入**：tangyuanAI 子包完全不变；本目录是 *纯扩展*，依赖 tangyuanAI 但不修改它。
 2. **配置驱动**：业务方通过写一个 ``agents_config.py`` 即可暴露自己的 Agent，不需要碰本目录代码。
 3. **OpenAI 兼容**：``POST /v1/agents/{name}/chat`` 的请求/响应尽量对齐 OpenAI Chat Completions API，
    让现有 OpenAI 客户端（curl / openai-python / 任何 OpenAI SDK）零改动接入。

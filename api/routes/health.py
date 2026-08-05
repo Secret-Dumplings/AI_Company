@@ -4,7 +4,7 @@ GET /health —— 健康检查 + 当前已注册的 Agent / 工具数量
 
 from __future__ import annotations
 
-import dumplingsAI
+import tangyuanAI
 from fastapi import APIRouter, Depends
 
 from ..deps import get_tool_registry
@@ -23,7 +23,7 @@ async def health(tool_registry=Depends(get_tool_registry)) -> HealthResponse:
 
     return HealthResponse(
         status="ok",
-        version=dumplingsAI.__version__,
-        n_agents=len(dumplingsAI.agent_list),
+        version=tangyuanAI.__version__,
+        n_agents=len(tangyuanAI.agent_list),
         n_tools=n_tools,
     )

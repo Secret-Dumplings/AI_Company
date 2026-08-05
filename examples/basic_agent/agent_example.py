@@ -4,7 +4,7 @@
 
 此示例展示如何：
 1. 注册自定义工具
-2. 创建 Agent 类
+2. 创建 Agent 类（模板池写法）
 3. 使用 Agent 进行对话
 """
 import sys
@@ -13,13 +13,14 @@ import os
 # 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import dumplingsAI
+import tangyuanAI
+from tangyuanAI.Agent_list import activate_template
 import uuid
 
 
 # 1. 注册工具
-@dumplingsAI.tool_registry.register_tool(
-    allowed_agents=["time_agent_uuid", "time_agent"],
+@tangyuanAI.tool_registry.register_tool(
+    allowed_agents=["time_agent"],
     name="get_time",
     description="获取当前时间",
     parameters={
@@ -33,9 +34,13 @@ def get_time():
     return "11:03"
 
 
-# 2. 创建调度 Agent
-@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduling_agent")
-class SchedulingAgent(dumplingsAI.BaseAgent):
+# 2. 创建调度 Agent（v0.3.0+ 模板池写法）
+@tangyuanAI.template_agent(
+    "scheduling_agent",
+    uuid=uuid.uuid4().hex,
+    description="调度 Agent 示例：演示与其他 Agent 通讯 + 使用工具",
+)
+class SchedulingAgent(tangyuanAI.BaseAgent):
     """
     调度 Agent 示例
 
@@ -65,8 +70,13 @@ class SchedulingAgent(dumplingsAI.BaseAgent):
 
 
 # 3. 创建时间 Agent
-@dumplingsAI.register_agent("time_agent_uuid", "time_agent")
-class TimeAgent(dumplingsAI.BaseAgent):
+TIME_AGENT_UUID = "time_agent_uuid"
+@tangyuanAI.template_agent(
+    "time_agent",
+    uuid=TIME_AGENT_UUID,
+    description="时间 Agent：提供时间查询服务",
+)
+class TimeAgent(tangyuanAI.BaseAgent):
     """
     时间 Agent 示例
 
@@ -85,8 +95,12 @@ class TimeAgent(dumplingsAI.BaseAgent):
 
 # 4. 运行示例
 if __name__ == "__main__":
+    # 显式激活模板（实例化并写入 agent_list）
+    activate_template("time_agent")
+    activate_template("scheduling_agent")
+
     # 获取调度 Agent 实例
-    schedule_agent = dumplingsAI.agent_list["scheduling_agent"]
+    schedule_agent = tangyuanAI.agent_list["scheduling_agent"]
 
     # 运行对话
     print("=== 基础 Agent 示例 ===")
@@ -94,5 +108,5 @@ if __name__ == "__main__":
 
     # 示例：请求时间 Agent 查询时间
     schedule_agent.conversation_with_tool(
-        "你现在有一个 id 为 time_agent_uuid 的同伴，请求它帮你查看现在时间"
+        f"你现在有一个 id 为 {TIME_AGENT_UUID} 的同伴，请求它帮你查看现在时间"
     )

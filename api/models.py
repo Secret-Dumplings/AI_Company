@@ -110,7 +110,7 @@ class ChatResponse(BaseModel):
     id: str = Field(default_factory=lambda: f"chatcmpl-{id(object())}")
     object: Literal["chat.completion"] = "chat.completion"
     created: int = Field(default_factory=lambda: __import__('time').time())
-    model: str = "dumplingsAI"
+    model: str = "tangyuanAI"
     choices: List[ChatChoice]
     usage: ChatUsage = Field(default_factory=ChatUsage)
     agent_name: str
@@ -142,7 +142,7 @@ class StreamChunk(BaseModel):
 class ToolRegistrationRequest(BaseModel):
     """运行时注册工具的请求
 
-    注意：当前 dumplingsAI.tool_registry 没有真正支持"运行时注册已存在的函数"，
+    注意：当前 tangyuanAI.tool_registry 没有真正支持"运行时注册已存在的函数"，
     所以这个 endpoint 只能让 server 端 import 一个函数引用（通过 module:function 路径）。
     实际落地用得最多的场景是"启动期注册"（通过 agents_config.py 一次到位），
     这里保留接口以备后续扩展。
@@ -177,7 +177,7 @@ class AgentRegistrationRequest(BaseModel):
     """
     运行时注册 Agent。
 
-    接收最小化的必填字段，自动构造一个 dumplingsAI.Agent 子类并 register。
+    接收最小化的必填字段，自动构造一个 tangyuanAI.Agent 子类并 register。
     缺点：动态类没有 __init_subclass__ 的钩子（子类覆写 @builtin_tool 时不会自动 promote），
     所以仅适合"基础对话场景"，需要 builtin_tool 的话还是用 agents_config.py 写静态类。
     """

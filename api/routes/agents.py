@@ -13,7 +13,7 @@ import json
 import uuid as _uuid
 from typing import Any, List, Optional
 
-import dumplingsAI
+import tangyuanAI
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -71,7 +71,7 @@ async def list_agent_tools(name_or_uuid: str) -> AgentAvailableToolsResponse:
 
     # 1) 注册的工具
     try:
-        tools_info = dumplingsAI.tool_registry.get_all_tools_info(inst.uuid) or {}
+        tools_info = tangyuanAI.tool_registry.get_all_tools_info(inst.uuid) or {}
         tool_names = sorted(tools_info.keys())
     except Exception:
         tool_names = []
@@ -79,7 +79,7 @@ async def list_agent_tools(name_or_uuid: str) -> AgentAvailableToolsResponse:
     # 2) 内置工具（@builtin_tool 自动收集）
     builtin_names: List[str] = []
     try:
-        for s in dumplingsAI.tool_registry.collect_builtin_tools(inst):
+        for s in tangyuanAI.tool_registry.collect_builtin_tools(inst):
             n = s.get("function", {}).get("name")
             if n:
                 builtin_names.append(n)
@@ -177,7 +177,7 @@ async def chat_with_agent(name_or_uuid: str, req: ChatRequest):
             tool=req.tool,
             images=req.images,
         )
-    except dumplingsAI.errors.APIError as e:
+    except tangyuanAI.errors.APIError as e:
         raise HTTPException(status_code=502, detail=f"LLM 调用失败：{e}") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -224,10 +224,10 @@ async def register_agent_runtime(req: AgentRegistrationRequest) -> AgentRegistra
     """
     try:
         if req.protocol == "anthropic":
-            from dumplingsAI.anthropic_agent import AnthropicAgent
+            from tangyuanAI.anthropic_agent import AnthropicAgent
             base_cls = AnthropicAgent
         else:
-            base_cls = dumplingsAI.BaseAgent
+            base_cls = tangyuanAI.BaseAgent
 
         # 动态构造子类
         uid = req.uuid or _uuid.uuid4().hex
@@ -248,14 +248,14 @@ async def register_agent_runtime(req: AgentRegistrationRequest) -> AgentRegistra
             attrs,
         )
 
-        # 用 dumplingsAI.register_agent 装饰
-        decorated = dumplingsAI.register_agent(uid, req.name, req.description)(new_cls)
+        # 用 tangyuanAI.register_agent 装饰
+        decorated = tangyuanAI.register_agent(uid, req.name, req.description)(new_cls)
         return AgentRegistrationResponse(
             name=req.name,
             uuid=uid,
             protocol=req.protocol,
             status="registered",
-            message=f"Agent 已注册到 dumplingsAI.agent_list（key: {uid!r} / {req.name!r}）",
+            message=f"Agent 已注册到 tangyuanAI.agent_list（key: {uid!r} / {req.name!r}）",
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -7,13 +7,13 @@ FastAPI 应用工厂 + lifespan。
 2. 注册路由
 3. 启动时（lifespan）按需加载用户的 ``agents_config.py``：
    - AGENTS_CONFIG 环境变量指定脚本路径（默认 examples/api/agents_config.py）
-   - import 脚本即触发 @register_agent 装饰器把 Agent 写入 dumplingsAI.agent_list
+   - import 脚本即触发 @register_agent 装饰器把 Agent 写入 tangyuanAI.agent_list
 
 为什么用 import 而不是 exec / runpy？
 
 - import 会触发模块级副作用（@register_agent），但不会污染用户的全局命名空间
 - 错误会以 ImportError 形式抛出，启动失败能立刻看到
-- 多次 reload 不会重复注册（dumplingsAI 用 uuid/名称双键去重）
+- 多次 reload 不会重复注册（tangyuanAI 用 uuid/名称双键去重）
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 
-import dumplingsAI
+import tangyuanAI
 
 from .routes import agents, health, mcp, skills, tools
 
@@ -61,7 +61,7 @@ def _load_agents_config(app: FastAPI) -> Optional[str]:
         return None
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    logger.info("AGENTS_CONFIG 已加载：%s（已注册 %d 个 Agent）", path, len(dumplingsAI.agent_list))
+    logger.info("AGENTS_CONFIG 已加载：%s（已注册 %d 个 Agent）", path, len(tangyuanAI.agent_list))
     return str(path)
 
 
@@ -76,10 +76,10 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="AI Company API",
         description=(
-            "把 dumplingsAI 框架暴露为 HTTP API。"
+            "把 tangyuanAI 框架暴露为 HTTP API。"
             "请求 / 响应尽量对齐 OpenAI Chat Completions，方便现有客户端零改动接入。"
         ),
-        version=dumplingsAI.__version__,
+        version=tangyuanAI.__version__,
         lifespan=lifespan,
     )
     app.include_router(health.router)

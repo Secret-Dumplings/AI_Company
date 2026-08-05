@@ -23,10 +23,10 @@
 
 | 部分 | 路径 | 角色 |
 |------|------|------|
-| **dumplingsAI（核心库）** | `Dumplings/` | 可独立安装、可被其他项目以 `uv add` 方式引用的框架包 |
-| **AI_Company（演示应用）** | 项目根目录 | 以 dumplingsAI 为依赖、组装实际业务 Agent 的示例项目 |
+| **tangyuanAI（核心库）** | `Tangyuan/` | 可独立安装、可被其他项目以 `uv add` 方式引用的框架包 |
+| **AI_Company（演示应用）** | 项目根目录 | 以 tangyuanAI 为依赖、组装实际业务 Agent 的示例项目 |
 
-> dumplingsAI 是 AI Company 的引擎；AI_Company 是基于该引擎构建的"示例公司"。两者通过 `uv` 的 workspace 机制绑定（见 `pyproject.toml` 的 `[tool.uv.workspace]`）。
+> tangyuanAI 是 AI Company 的引擎；AI_Company 是基于该引擎构建的"示例公司"。两者通过 `uv` 的 workspace 机制绑定（见 `pyproject.toml` 的 `[tool.uv.workspace]`）。
 
 ### 2. 核心能力一览
 
@@ -63,7 +63,7 @@
 
 ```
 AI_Company/
-├── Dumplings/                       # 核心框架包（独立可发布的 wheel）
+├── Tangyuan/                       # 核心框架包（独立可发布的 wheel）
 │   ├── __init__.py                  # 模块导出 + help() 速查
 │   ├── Agent_Base_.py              # BaseAgent 抽象类：对话/工具/历史/钩子
 │   ├── Agent_list.py                # register_agent + agent_list 全局注册表
@@ -75,7 +75,7 @@ AI_Company/
 │   ├── LOGGING_GUIDELINES.md        # 日志级别使用规范
 │   ├── README.md                    # 框架独立文档
 │   ├── LICENSE                      # Apache 2.0
-│   └── pyproject.toml               # dumplingsAI 包的元数据
+│   └── pyproject.toml               # tangyuanAI 包的元数据
 │
 ├── examples/                        # AI Company 侧的运行示例
 │   ├── basic_agent/agent_example.py          # 单 Agent + 工具示例
@@ -96,7 +96,7 @@ AI_Company/
 
 ### 2. 核心组件详解
 
-#### 2.1 `register_agent` + `agent_list`（`Dumplings/Agent_list.py`）
+#### 2.1 `register_agent` + `agent_list`（`Tangyuan/Agent_list.py`）
 
 ```python
 agent_list = {}          # 双键字典: {uuid: instance, name: instance}
@@ -116,11 +116,11 @@ def register_agent(uuid, name, description=None):
 要点：
 - 一个类同时挂在两个键下（UUID + name），内存中只有一份实例
 - 注册时**立即实例化**（`cls()`），所以 Agent 必须有无参 `__init__`
-- 注册完成后，通过 `dumplingsAI.agent_list["name"]` 或 `[uuid]` 都能取到同一个实例
+- 注册完成后，通过 `tangyuanAI.agent_list["name"]` 或 `[uuid]` 都能取到同一个实例
 
-#### 2.2 `BaseAgent`（`Dumplings/Agent_Base_.py`）
+#### 2.2 `BaseAgent`（`Tangyuan/Agent_Base_.py`）
 
-继承 `dumplingsAI.BaseAgent`（实际导出名为 `Agent`），必须设置 4 个类属性：
+继承 `tangyuanAI.BaseAgent`（实际导出名为 `Agent`），必须设置 4 个类属性：
 
 | 属性 | 必填 | 用途 |
 |------|------|------|
@@ -153,14 +153,14 @@ def register_agent(uuid, name, description=None):
 | `reload()` | 重新拼装系统提示词以反映工具/Skills 变化 |
 | `out(content)` | 输出回调，可被重写以劫持输出流 |
 
-#### 2.3 `tool_registry`（`Dumplings/agent_tool.py`）
+#### 2.3 `tool_registry`（`Tangyuan/agent_tool.py`）
 
 全局工具注册器（单例 `tool_registry = tool()`）。
 
 注册签名（**请按此顺序传参，避免命名混淆**）：
 
 ```python
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=None,            # str | List[str] | None（None=全体可用）
     description="...",              # 工具描述
     name="tool_name",               # 工具名（默认 = 函数名）
@@ -190,11 +190,11 @@ def register_agent(uuid, name, description=None):
 
 > 这些工具同时支持 Function Calling 和 XML 两种调用方式。
 
-#### 2.5 MCP 桥接（`Dumplings/mcp_bridge.py`）
+#### 2.5 MCP 桥接（`Tangyuan/mcp_bridge.py`）
 
 ```python
-from dumplingsAI.mcp_bridge import register_mcp_tools, start_health_check
-dumplingsAI.register_mcp_tools("path/to/mcp_server.py")
+from tangyuanAI.mcp_bridge import register_mcp_tools, start_health_check
+tangyuanAI.register_mcp_tools("path/to/mcp_server.py")
 start_health_check(interval=300)
 ```
 
@@ -203,13 +203,13 @@ start_health_check(interval=300)
 - 维护全局会话池 `_global_session_pool`，对 session 做健康检查与自动回收
 - 提供 `close_all_mcp_sessions_sync()`、`mcp_session_context()` 等同步/异步上下文
 
-#### 2.6 Skill 系统（`Dumplings/skill.py` + `skill_bridge.py`）
+#### 2.6 Skill 系统（`Tangyuan/skill.py` + `skill_bridge.py`）
 
 - `skill_registry` 扫描 `.claude/skills/` 或任意目录，把符合 Skill 规范的子目录注册进来
 - 通过 `skill_bridge` 把 Skill "伪装"成普通工具挂到 `tool_registry`，所以 Agent 完全无感知
 - Agent 在初始化时，Skill 会以 Prompt 文本 + Function Calling Schema 两种形式同时注入
 
-#### 2.7 日志（`Dumplings/logging_config.py` + `LOGGING_GUIDELINES.md`）
+#### 2.7 日志（`Tangyuan/logging_config.py` + `LOGGING_GUIDELINES.md`）
 
 - 控制台 + `logs/app.log` 双路输出
 - 级别由环境变量 `LOGURU_LEVEL` 控制：默认不显式设置时按代码内默认值
@@ -245,12 +245,12 @@ start_health_check(interval=300)
 ### 2. 克隆与安装
 
 ```bash
-git clone https://github.com/Secret-Dumplings/AI_Company.git
+git clone https://github.com/secret-tangyuan/AI_Company.git
 cd AI_Company
 uv sync
 ```
 
-`pyproject.toml` 用 uv workspace 把 `Dumplings/` 作为本地包自动链接，无需手动 `pip install`。
+`pyproject.toml` 用 uv workspace 把 `Tangyuan/` 作为本地包自动链接，无需手动 `pip install`。
 
 ### 3. 配置 API Key
 
@@ -282,12 +282,12 @@ uv run examples/multi_agent/ask_for_help_example.py
 ```python
 import os, uuid
 from dotenv import load_dotenv
-import dumplingsAI
+import tangyuanAI
 
 load_dotenv()
 
 # 1. 可选：注册一个工具（Function Calling 模式）
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["my_agent"],   # None/[] 表示全员可用
     description="查询某城市天气",
     name="get_weather",
@@ -303,8 +303,8 @@ def get_weather(city: str) -> str:
     return f"{city}今天晴，温度 25°C"
 
 # 2. 注册 Agent
-@dumplingsAI.register_agent(uuid.uuid4().hex, "my_agent", "你的Agent简介")
-class MyAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "my_agent", "你的Agent简介")
+class MyAgent(tangyuanAI.BaseAgent):
     prompt = "你是一个天气助手，使用 get_weather 查询天气。"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name   = "model_name"
@@ -315,20 +315,20 @@ class MyAgent(dumplingsAI.BaseAgent):
         super().__init__()
 
 if __name__ == "__main__":
-    agent = dumplingsAI.agent_list["my_agent"]
+    agent = tangyuanAI.agent_list["my_agent"]
     agent.conversation_with_tool("帮我查一下北京的天气")
 ```
 
 Agent 也可以定义 `description`：
 
 ```python
-@dumplingsAI.register_agent(uuid.uuid4().hex, "weather_agent", "天气查询专家，支持多城市")
+@tangyuanAI.register_agent(uuid.uuid4().hex, "weather_agent", "天气查询专家，支持多城市")
 ```
 
 **注意**：`description` 在 `BaseAgent` 中已存在类属性，但当前 `Agent.__init__` 主要使用 `cls.prompt` / `cls.uuid` / `cls.name`，description 仅作元信息暴露。如需在 prompt 中引用，可以重写 `__init__`：
 
 ```python
-class MyAgent(dumplingsAI.BaseAgent):
+class MyAgent(tangyuanAI.BaseAgent):
     def __init__(self):
         self.prompt = self.prompt + f"\n（描述：{self.__class__.description}）"
         super().__init__()
@@ -338,8 +338,8 @@ class MyAgent(dumplingsAI.BaseAgent):
 
 ```python
 # 注册多个 Agent 后，让主 Agent 通过 ask_for_help 调用子 Agent
-@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduler")
-class Scheduler(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "scheduler")
+class Scheduler(tangyuanAI.BaseAgent):
     prompt = (
         "你是调度 Agent。当用户需要查时间时，使用 ask_for_help 调用 "
         "time_agent；当用户需要查天气时，调用 weather_agent。"
@@ -352,7 +352,7 @@ class Scheduler(dumplingsAI.BaseAgent):
     def __init__(self):
         super().__init__()
 
-dumplingsAI.agent_list["scheduler"].conversation_with_tool(
+tangyuanAI.agent_list["scheduler"].conversation_with_tool(
     "现在几点了？顺便查下北京天气。"
 )
 ```
@@ -361,7 +361,7 @@ dumplingsAI.agent_list["scheduler"].conversation_with_tool(
 
 ```python
 from pathlib import Path
-from dumplingsAI.mcp_bridge import register_mcp_tools
+from tangyuanAI.mcp_bridge import register_mcp_tools
 
 # 让 MCP 服务器的所有工具注册到 tool_registry
 register_mcp_tools(
@@ -381,14 +381,14 @@ register_mcp_tools(
 ```
 
 ```python
-dumplingsAI.skill_registry.scan_and_register([Path(".")])
+tangyuanAI.skill_registry.scan_and_register([Path(".")])
 # Skills 会自动出现在 Agent 的工具列表 / 系统提示词中
 ```
 
 ### 9. 自定义 Agent 行为
 
 ```python
-class MyAgent(dumplingsAI.BaseAgent):
+class MyAgent(tangyuanAI.BaseAgent):
     # 自定义流式输出
     def out(self, content):
         if content.get("tool_name"):
@@ -412,16 +412,16 @@ class MyAgent(dumplingsAI.BaseAgent):
 
 ```python
 # 列出所有已注册工具
-print(dumplingsAI.tool_registry.list_tools())
+print(tangyuanAI.tool_registry.list_tools())
 
 # 列出某个 Agent 可用的工具
-print(dumplingsAI.tool_registry.get_all_tools_info("uuid-or-name"))
+print(tangyuanAI.tool_registry.get_all_tools_info("uuid-or-name"))
 
 # 查看 Agent 历史
-print(dumplingsAI.agent_list["my_agent"].history)
+print(tangyuanAI.agent_list["my_agent"].history)
 
 # 关闭 MCP 会话
-from dumplingsAI.mcp_bridge import close_all_mcp_sessions_sync
+from tangyuanAI.mcp_bridge import close_all_mcp_sessions_sync
 close_all_mcp_sessions_sync()
 ```
 
@@ -462,7 +462,7 @@ close_all_mcp_sessions_sync()
 
 ### 5. 日志规范（强约束）
 
-遵循 `Dumplings/LOGGING_GUIDELINES.md`：
+遵循 `Tangyuan/LOGGING_GUIDELINES.md`：
 
 | 级别 | 允许内容 | 禁止内容 |
 |------|----------|----------|
@@ -474,7 +474,7 @@ close_all_mcp_sessions_sync()
 | `CRITICAL` | 核心服务崩溃 | — |
 
 - **不要把 API Key、对话内容、用户隐私信息写入日志**
-- 推荐通过 `from dumplingsAI.logging_config import setup_logging` 统一初始化
+- 推荐通过 `from tangyuanAI.logging_config import setup_logging` 统一初始化
 - 提交 PR 前用 `LOGURU_LEVEL=INFO` 自查一次：不应该看到 prompt 内容或长 history
 
 ### 6. 异常与健壮性
@@ -485,15 +485,15 @@ close_all_mcp_sessions_sync()
 
 ### 7. 依赖与代码组织
 
-- **不要新增重型框架**：dumplingsAI 鼓励"轻 + 协议"，如需新增中间件，请在 `Dumplings/` 内加包并在 `__init__.py` 集中导出
+- **不要新增重型框架**：tangyuanAI 鼓励"轻 + 协议"，如需新增中间件，请在 `Tangyuan/` 内加包并在 `__init__.py` 集中导出
 - **新增示例请放到 `examples/<主题>/xxx.py`**，并在 `main.py` 或 `README.md` 中给出运行命令
-- **保持工作区结构**：`dumplingsAI` 作为子包加入 `[tool.uv.workspace]`；任何子包修改都对根项目立即可见
+- **保持工作区结构**：`tangyuanAI` 作为子包加入 `[tool.uv.workspace]`；任何子包修改都对根项目立即可见
 - **API 兼容性**：目前面向 OpenAI-compatible Chat Completions 设计，**不要**将 Anthropic/Gemini 等专有协议写进核心，可在 `BaseAgent` 派生
 
 ### 8. 提交与变更约定
 
 - 中文/英文提交信息都可，但建议中英对照，遵守"修复 bug / 增加功能 / 优化结构"三类关键词
-- 修改 `Dumplings/` 后建议在 README 或 docs 中同步更新对应章节
+- 修改 `Tangyuan/` 后建议在 README 或 docs 中同步更新对应章节
 - 引入新的环境变量时，请在本文件"常用环境变量"小节追加
 
 ### 9. 安全与合规
@@ -509,7 +509,7 @@ close_all_mcp_sessions_sync()
 **Q1：Agent 注册后调用报"找不到工具"？**
 1. 确认工具的 `allowed_agents` 列表包含该 Agent 的 UUID 或 name
 2. 确认 prompt 中确实告诉 LLM 可以使用该工具（系统将自动补充prompt请检查注册情况）
-3. 调 `dumplingsAI.tool_registry.get_all_tools_info(uuid)` 验证
+3. 调 `tangyuanAI.tool_registry.get_all_tools_info(uuid)` 验证
 
 **Q2：Agent 之间 `ask_for_help` 后没反应？**
 1. 确认目标 Agent 已注册（`name` 或 `uuid` 不打错）
@@ -517,7 +517,7 @@ close_all_mcp_sessions_sync()
 3. 看 `logs/app.log` 中是否有 WARNING/ERROR
 
 **Q3：怎么让 Agent 看见我新加的工具？**
-调用 `dumplingsAI.agent_list["my_agent"].reload()`，或在脚本入口重新 `import` 并让 Agent 重新初始化。
+调用 `tangyuanAI.agent_list["my_agent"].reload()`，或在脚本入口重新 `import` 并让 Agent 重新初始化。
 
 **Q4：怎么调试提示词？**
 - 临时把 `LOGURU_LEVEL=DEBUG` 看流程
@@ -528,7 +528,7 @@ close_all_mcp_sessions_sync()
 
 ## 附录 B：与官方 SDK 的功能差距
 
-> 本节对比 `dumplingsAI.BaseAgent` / `dumplingsAI.AnthropicAgent` 与
+> 本节对比 `tangyuanAI.BaseAgent` / `tangyuanAI.AnthropicAgent` 与
 > [`openai-python`](https://github.com/openai/openai-python) /
 > [`anthropic-sdk-python`](https://github.com/anthropics/anthropic-sdk-python)
 > 官方 Python SDK，解释我们在哪里做了简化、哪些能力尚未实现。
@@ -579,7 +579,7 @@ close_all_mcp_sessions_sync()
 
 ## 附录 C：`AnthropicAgent` 使用指南
 
-> 新增于 2026 年，对应 `Dumplings/Anthropic` 协议。整个体验与 `BaseAgent` 一致，仅协议层不同。
+> 新增于 2026 年，对应 `Tangyuan/Anthropic` 协议。整个体验与 `BaseAgent` 一致，仅协议层不同。
 
 ### 安装与配置
 
@@ -596,11 +596,11 @@ export ANTHROPIC_MODEL=claude-3-5-sonnet-latest       # 可选
 ```python
 import os, uuid
 from dotenv import load_dotenv
-import dumplingsAI
+import tangyuanAI
 
 load_dotenv()
 
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["weather_agent"],
     description="查询某城市的天气",
     name="get_weather",
@@ -613,14 +613,14 @@ load_dotenv()
 def get_weather(city: str) -> str:
     return f"{city}今天晴，25°C"
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "weather_agent", "天气小助手")
-class WeatherAgent(dumplingsAI.anthropic_agent.AnthropicAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "weather_agent", "天气小助手")
+class WeatherAgent(tangyuanAI.anthropic_agent.AnthropicAgent):
     prompt = "你是天气助手，调用 get_weather 拿天气；用 attempt_completion 汇报。"
     api_provider = "https://api.anthropic.com"
     model_name   = os.getenv("ANTHROPIC_MODEL")
     api_key      = os.getenv("ANTHROPIC_API_KEY")
 
-agent = dumplingsAI.agent_list["weather_agent"]
+agent = tangyuanAI.agent_list["weather_agent"]
 agent.conversation_with_tool("请帮我查一下北京今天的天气")
 ```
 
@@ -642,12 +642,12 @@ agent.conversation_with_tool("请帮我查一下北京今天的天气")
 
 ### 通用装饰器：`@builtin_tool`
 
-不论用哪个协议，Agent 的内置工具都通过 `dumplingsAI.agent_tool.builtin_tool` 声明，**不再有硬编码 schema**：
+不论用哪个协议，Agent 的内置工具都通过 `tangyuanAI.agent_tool.builtin_tool` 声明，**不再有硬编码 schema**：
 
 ```python
-from dumplingsAI import builtin_tool
+from tangyuanAI import builtin_tool
 
-class MyAgent(dumplingsAI.anthropic_agent.AnthropicAgent):
+class MyAgent(tangyuanAI.anthropic_agent.AnthropicAgent):
     @builtin_tool(
         description="发一条 Slack 通知",
         params={"channel": "频道名", "text": "消息内容"},
@@ -676,20 +676,20 @@ class MyAgent(dumplingsAI.anthropic_agent.AnthropicAgent):
 两个协议共享同一份 `agent_list` / `tool_registry` / `skill_registry`：
 
 ```python
-@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduler")
-class Scheduler(dumplingsAI.BaseAgent):           # OpenAI 协议
+@tangyuanAI.register_agent(uuid.uuid4().hex, "scheduler")
+class Scheduler(tangyuanAI.BaseAgent):           # OpenAI 协议
     prompt = "..."
     api_provider = "https://coding.dashscope.aliyuncs.com/v1/chat/completions"
     model_name   = os.getenv("OPENAI_MODEL")
     api_key      = os.getenv("API_KEY")
     fc_model     = True
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "weather")
-class Weather(dumplingsAI.anthropic_agent.AnthropicAgent):  # Anthropic 协议
+@tangyuanAI.register_agent(uuid.uuid4().hex, "weather")
+class Weather(tangyuanAI.anthropic_agent.AnthropicAgent):  # Anthropic 协议
     ...
 
 # scheduler 可直接 ask_for_help 把任务分发给 weather，反之亦然
-dumplingsAI.agent_list["scheduler"].conversation_with_tool(
+tangyuanAI.agent_list["scheduler"].conversation_with_tool(
     "请 request_weather 帮你查一下北京的天气"
 )
 ```
@@ -708,18 +708,18 @@ dumplingsAI.agent_list["scheduler"].conversation_with_tool(
 
 | 主题 | 文件 |
 |------|------|
-| Agent 基类（OpenAI 协议） | `Dumplings/Agent_Base_.py` |
-| Agent 基类（Anthropic 协议） | `Dumplings/anthropic_agent.py` |
-| Agent 注册 | `Dumplings/Agent_list.py` |
-| 工具注册 + `@builtin_tool` 装饰器 | `Dumplings/agent_tool.py` |
-| MCP 桥接 | `Dumplings/mcp_bridge.py` |
-| Skill 系统 | `Dumplings/skill.py`、`Dumplings/skill_bridge.py` |
-| 日志 | `Dumplings/logging_config.py`、`Dumplings/LOGGING_GUIDELINES.md` |
+| Agent 基类（OpenAI 协议） | `Tangyuan/Agent_Base_.py` |
+| Agent 基类（Anthropic 协议） | `Tangyuan/anthropic_agent.py` |
+| Agent 注册 | `Tangyuan/Agent_list.py` |
+| 工具注册 + `@builtin_tool` 装饰器 | `Tangyuan/agent_tool.py` |
+| MCP 桥接 | `Tangyuan/mcp_bridge.py` |
+| Skill 系统 | `Tangyuan/skill.py`、`Tangyuan/skill_bridge.py` |
+| 日志 | `Tangyuan/logging_config.py`、`Tangyuan/LOGGING_GUIDELINES.md` |
 | 顶层示例 | `main.py`、`examples/basic_agent/agent_example.py`、`examples/multi_agent/ask_for_help_example.py` |
 | Anthropic 协议示例 | `examples/anthropic_agent/agent_example.py` |
 | 完整开发指南 | `docs.md` |
 | 项目说明 | `README.md` |
-| 框架独立文档 | `Dumplings/README.md` |
+| 框架独立文档 | `Tangyuan/README.md` |
 
 ---
 

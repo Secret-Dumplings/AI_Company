@@ -1,9 +1,9 @@
 import sys
 from dotenv import load_dotenv
 import os
-import dumplingsAI
+import tangyuanAI
 import uuid
-# from dumplingsAI import tool_registry
+# from tangyuanAI import tool_registry
 
 # 测试用
 try:
@@ -14,7 +14,7 @@ except:
 
 load_dotenv()
 
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["8841cd45eef54217bc8122cafebe5fd6", "time_agent"],
     name="get_time",
     description="获取当前时间",
@@ -28,9 +28,14 @@ def get_time(xml=None):
     # 兼容两种调用方式：Function Calling（无参数）和 XML（接收xml字符串）
     return "11:03"
 
-# @dumplingsAI.register_agent(uuid.uuid4().hex, "scheduling_agent2") 可通过叠加装饰器创建多实例
-@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduling_agent","用于调用其他ai分类需求，回答简易问题，总结subagent的返回")
-class scheduling_agent(dumplingsAI.Agent):
+# @tangyuanAI.template_agent(name) 可通过叠加装饰器创建多实例；
+# 调用 activate_template(name) 后才真正实例化并写入 agent_list。
+@tangyuanAI.template_agent(
+    "scheduling_agent",
+    uuid=uuid.uuid4().hex,
+    description="用于调用其他ai分类需求，回答简易问题，总结subagent的返回",
+)
+class scheduling_agent(tangyuanAI.Agent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你可以使用<attempt_completion>标签直接退出对话（你不可再次获得任何信息）， 它的语法为<attempt_completion><report_content>放入你想播报的内容，或留空</report_content></attempt_completion>"""
     prompt = f"你是一个名为汤圆Agent的AGI"
     api_provider = "https://api.minimaxi.com/anthropic"
@@ -71,8 +76,12 @@ class scheduling_agent(dumplingsAI.Agent):
             print()
 
 
-@dumplingsAI.register_agent("8841cd45eef54217bc8122cafebe5fd6", "time_agent","用于获取当前时间")
-class time_agent(dumplingsAI.Agent):
+@tangyuanAI.template_agent(
+    "time_agent",
+    uuid="8841cd45eef54217bc8122cafebe5fd6",
+    description="用于获取当前时间",
+)
+class time_agent(tangyuanAI.Agent):
     """，你可以用<ask_for_help><agent_id>id</agent_id><message>message</message></ask_for_help>的方式与其他Agent通讯, 你还有get_time可以查询时间（直接<get_time></get_time>即可）"""
     prompt = "你是一个名为汤圆Agent的AGI的子agent名为时间管理者， 你可以通过工具获取时间"
     api_provider = "https://api.minimaxi.com/anthropic"
@@ -85,8 +94,12 @@ class time_agent(dumplingsAI.Agent):
 
 
 if __name__ == "__main__":
-    # dumplingsAI.register_agent(uuid.uuid4().hex,"scheduling_agent",)(scheduling_agent) # 通过函数的方法注册
-    schedule_agent = dumplingsAI.agent_list["scheduling_agent"]
+    # 新写法（v0.3.0+ 模板池）：显式激活后才实例化、写入 agent_list
+    tangyuanAI.activate_template("time_agent")
+    tangyuanAI.activate_template("scheduling_agent")
+
+    # tangyuanAI.register_agent("scheduling_agent", scheduling_agent)(scheduling_agent)  # 函数式注册（也可）
+    schedule_agent = tangyuanAI.agent_list["scheduling_agent"]
     # schedule_agent.conversation_with_tool("你好")
     schedule_agent.conversation_with_tool("你现在有一个id为8841cd45eef54217bc8122cafebe5fd6的同伴，请求它帮你查看现在时间")
     # scheduling_agent.reload()  # 通过函数重置AI提示词

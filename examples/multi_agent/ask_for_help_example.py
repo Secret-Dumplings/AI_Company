@@ -12,12 +12,13 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-import dumplingsAI
+import tangyuanAI
+from tangyuanAI.Agent_list import activate_template
 import uuid
 
 
 # 工具：获取时间（支持 Function Calling 和 XML 两种方式）
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["time_agent", "assistant_agent"],
     name="get_time",
     description="获取当前时间",
@@ -39,8 +40,13 @@ def get_time():
 
 
 # Agent 1: 时间 Agent
-@dumplingsAI.register_agent("time_agent_uuid", "time_agent")
-class TimeAgent(dumplingsAI.BaseAgent):
+TIME_AGENT_UUID = "time_agent_uuid"
+@tangyuanAI.template_agent(
+    "time_agent",
+    uuid=TIME_AGENT_UUID,
+    description="时间 Agent：负责提供时间查询服务（可调用 get_time 工具）",
+)
+class TimeAgent(tangyuanAI.BaseAgent):
     """
     时间 Agent - 负责提供时间查询服务
 
@@ -57,8 +63,13 @@ class TimeAgent(dumplingsAI.BaseAgent):
 
 
 # Agent 2: 助手 Agent（支持 ask_for_help）
-@dumplingsAI.register_agent("assistant_agent_uuid", "assistant_agent")
-class AssistantAgent(dumplingsAI.BaseAgent):
+ASSISTANT_AGENT_UUID = "assistant_agent_uuid"
+@tangyuanAI.template_agent(
+    "assistant_agent",
+    uuid=ASSISTANT_AGENT_UUID,
+    description="助手 Agent：负责协调其他 Agent，可请求 ask_for_help",
+)
+class AssistantAgent(tangyuanAI.BaseAgent):
     """
     助手 Agent - 负责协调其他 Agent
 
@@ -93,8 +104,13 @@ class AssistantAgent(dumplingsAI.BaseAgent):
 
 
 # Agent 3: 调度 Agent（协调多个 Agent）
-@dumplingsAI.register_agent(str(uuid.uuid4()), "scheduling_agent")
-class SchedulingAgent(dumplingsAI.BaseAgent):
+SCHEDULING_AGENT_UUID = str(uuid.uuid4())
+@tangyuanAI.template_agent(
+    "scheduling_agent",
+    uuid=SCHEDULING_AGENT_UUID,
+    description="调度 Agent：负责协调多个 Agent 完成用户的复杂任务",
+)
+class SchedulingAgent(tangyuanAI.BaseAgent):
     """
     调度 Agent - 负责协调多个 Agent 完成任务
     """
@@ -118,8 +134,13 @@ class SchedulingAgent(dumplingsAI.BaseAgent):
 if __name__ == "__main__":
     print("=== 多 Agent 协作示例 ===\n")
 
+    # v0.3.0+ 模板池：先激活再使用
+    activate_template("time_agent")
+    activate_template("assistant_agent")
+    activate_template("scheduling_agent")
+
     # 获取助手 Agent 实例
-    assistant = dumplingsAI.agent_list["assistant_agent"]
+    assistant = tangyuanAI.agent_list["assistant_agent"]
 
     # 示例 1: 请求时间 Agent 查询时间
     print("--- 示例 1: 查询时间 ---")

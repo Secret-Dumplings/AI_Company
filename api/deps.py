@@ -1,7 +1,7 @@
 """
-FastAPI 依赖注入：把 dumplingsAI 的全局对象暴露给路由。
+FastAPI 依赖注入：把 tangyuanAI 的全局对象暴露给路由。
 
-不在路由函数里 import dumplingsAI / agent_list / tool_registry，
+不在路由函数里 import tangyuanAI / agent_list / tool_registry，
 而是通过 Depends 注入 —— 便于测试时替换为 mock。
 """
 
@@ -10,20 +10,20 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, Optional
 
-import dumplingsAI
+import tangyuanAI
 from fastapi import HTTPException
 
 from .models import AgentInfo
 
 
 def get_agent_list() -> Dict[str, Any]:
-    """返回 dumplingsAI.agent_list 字典（key: uuid or name）"""
-    return dumplingsAI.agent_list
+    """返回 tangyuanAI.agent_list 字典（key: uuid or name）"""
+    return tangyuanAI.agent_list
 
 
 def get_tool_registry() -> Any:
-    """返回 dumplingsAI.tool_registry 实例"""
-    return dumplingsAI.tool_registry
+    """返回 tangyuanAI.tool_registry 实例"""
+    return tangyuanAI.tool_registry
 
 
 def get_agent_or_404(name_or_uuid: str) -> Any:
@@ -32,12 +32,12 @@ def get_agent_or_404(name_or_uuid: str) -> Any:
 
     Agent 注册时同时登记到两个 key（uuid 和 name），所以一次 lookup 就能命中。
     """
-    inst = dumplingsAI.agent_list.get(name_or_uuid)
+    inst = tangyuanAI.agent_list.get(name_or_uuid)
     if inst is None:
         raise HTTPException(
             status_code=404,
             detail=f"Agent 不存在：{name_or_uuid!r}。"
-                   f"已注册：{sorted(dumplingsAI.agent_list.keys())}",
+                   f"已注册：{sorted(tangyuanAI.agent_list.keys())}",
         )
     return inst
 

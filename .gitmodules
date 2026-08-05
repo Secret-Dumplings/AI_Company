@@ -1,3 +1,3 @@
-[submodule "Dumplings"]
-	path = Dumplings
-	url = https://github.com/Secret-Dumplings/Dumplings.git
+[submodule "Tangyuan"]
+	path = Tangyuan
+	url = https://github.com/secret-tangyuan/tangyuanAI.git

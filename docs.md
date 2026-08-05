@@ -23,12 +23,12 @@
 ### 第一个 Agent
 
 ```python
-import dumplingsAI
+import tangyuanAI
 import os
 import uuid
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "my_first_agent")
-class MyFirstAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "my_first_agent")
+class MyFirstAgent(tangyuanAI.BaseAgent):
     """我的第一个智能体"""
 
     prompt = "你是一个有用的助手。"
@@ -61,7 +61,7 @@ class MyFirstAgent(dumplingsAI.BaseAgent):
 Agent 通过装饰器注册到全局 `agent_list`：
 
 ```python
-@dumplingsAI.register_agent(uuid, name)
+@tangyuanAI.register_agent(uuid, name)
 ```
 
 - **uuid**: 唯一标识符，推荐使用 `uuid.uuid4().hex`
@@ -69,8 +69,8 @@ Agent 通过装饰器注册到全局 `agent_list`：
 
 注册后，Agent 可以通过 UUID 或名称访问：
 ```python
-agent = dumplingsAI.agent_list["my_agent"]  # 通过名称
-agent = dumplingsAI.agent_list["uuid"]       # 通过 UUID
+agent = tangyuanAI.agent_list["my_agent"]  # 通过名称
+agent = tangyuanAI.agent_list["uuid"]       # 通过 UUID
 ```
 
 ---
@@ -80,12 +80,12 @@ agent = dumplingsAI.agent_list["uuid"]       # 通过 UUID
 ### 基础模板
 
 ```python
-import dumplingsAI
+import tangyuanAI
 import os
 import uuid
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "agent_name")
-class MyAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "agent_name")
+class MyAgent(tangyuanAI.BaseAgent):
     """Agent 描述"""
 
     # 1. 系统提示词
@@ -117,8 +117,8 @@ class MyAgent(dumplingsAI.BaseAgent):
 ### 带自定义属性的 Agent
 
 ```python
-@dumplingsAI.register_agent(uuid.uuid4().hex, "special_agent")
-class SpecialAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "special_agent")
+class SpecialAgent(tangyuanAI.BaseAgent):
     prompt = "你是一个特殊的智能体。"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name = "gpt-4o"
@@ -143,7 +143,7 @@ class SpecialAgent(dumplingsAI.BaseAgent):
 ### 工具装饰器参数
 
 ```python
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=None,      # 允许使用的 Agent 列表 (None=全部)
     name="tool_name",         # 工具名称
     description="工具描述",    # 工具描述
@@ -161,7 +161,7 @@ class SpecialAgent(dumplingsAI.BaseAgent):
 ### XML 模式工具 (次要支持，请使用function calling)
 
 ```python
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["my_agent"],
     name="search_web",
     description="搜索互联网信息",
@@ -199,7 +199,7 @@ def search_web(xml: str = None) -> str:
 ### Function Calling 模式工具
 
 ```python
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["my_agent"],
     name="calculate",
     description="执行数学计算",
@@ -233,7 +233,7 @@ def calculate(**kwargs) -> str:
 
 ```python
 # 全局工具 (所有 Agent 可用)
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=None,
     name="log_event",
     description="记录事件"
@@ -243,7 +243,7 @@ def log_event(**kwargs):
     pass
 
 # 限制特定 Agent 使用
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["agent1", "agent2"],
     name="admin_tool",
     description="管理员工具"
@@ -295,8 +295,8 @@ Agent 自动拥有以下内置通信工具：
 ### 示例：Agent 协作
 
 ```python
-@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduler_agent")
-class SchedulerAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "scheduler_agent")
+class SchedulerAgent(tangyuanAI.BaseAgent):
     prompt = """
 你是一个任务调度助手。你可以通过 <ask_for_help> 请求其他 Agent 帮助。
 
@@ -308,15 +308,15 @@ class SchedulerAgent(dumplingsAI.BaseAgent):
     api_key = os.getenv("API_KEY")
     fc_model = True  # 启用 Function Calling
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "data_agent")
-class DataAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "data_agent")
+class DataAgent(tangyuanAI.BaseAgent):
     prompt = "你是一个数据分析助手。"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name = "gpt-4o"
     api_key = os.getenv("API_KEY")
 
 # 使用
-scheduler = dumplingsAI.agent_list["scheduler_agent"]
+scheduler = tangyuanAI.agent_list["scheduler_agent"]
 scheduler.conversation_with_tool("请让 data_agent 帮我分析数据")
 ```
 
@@ -326,10 +326,10 @@ scheduler.conversation_with_tool("请让 data_agent 帮我分析数据")
 
 ### MCP 服务器结构
 
-MCP (Model Context Protocol) 工具位于 `Dumplings/mcp/` 目录下：
+MCP (Model Context Protocol) 工具位于 `Tangyuan/mcp/` 目录下：
 
 ```
-Dumplings/mcp/
+Tangyuan/mcp/
 ├── weather_mcp/
 │   └── weather_server.py  # 天气工具示例
 └── [your_tool_name]/
@@ -339,15 +339,15 @@ Dumplings/mcp/
 ### 注册 MCP 工具
 
 ```python
-from dumplingsAI.mcp_bridge import register_mcp_tools
+from tangyuanAI.mcp_bridge import register_mcp_tools
 
 # 注册 MCP 服务器
-register_mcp_tools("Dumplings/mcp/weather_mcp/weather_server.py")
+register_mcp_tools("Tangyuan/mcp/weather_mcp/weather_server.py")
 ```
 
 ### 创建 MCP 工具服务器
 
-参考 `Dumplings/mcp/weather_mcp/weather_server.py` 示例：
+参考 `Tangyuan/mcp/weather_mcp/weather_server.py` 示例：
 
 ```python
 #!/usr/bin/env python3
@@ -426,14 +426,14 @@ if __name__ == "__main__":
 import sys
 from dotenv import load_dotenv
 import os
-import dumplingsAI
+import tangyuanAI
 import uuid
 
 load_dotenv()
 
 # ============ 步骤1: 注册工具 ============
 
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["time_agent"],
     name="get_current_time",
     description="获取当前时间",
@@ -449,7 +449,7 @@ def get_current_time(xml=None):
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=None,  # 全局工具
     name="search_info",
     description="搜索互联网信息",
@@ -469,8 +469,8 @@ def search_info(**kwargs):
 
 # ============ 步骤2: 创建时间管理 Agent ============
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "time_agent")
-class TimeAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "time_agent")
+class TimeAgent(tangyuanAI.BaseAgent):
     """
     时间管理智能体
     - 可以查询当前时间
@@ -495,8 +495,8 @@ class TimeAgent(dumplingsAI.BaseAgent):
 
 # ============ 步骤3: 创建任务调度 Agent ============
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "scheduler_agent")
-class SchedulerAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "scheduler_agent")
+class SchedulerAgent(tangyuanAI.BaseAgent):
     """
     任务调度智能体
     - 可以搜索信息
@@ -534,7 +534,7 @@ if __name__ == "__main__":
     print("=" * 50)
 
     # 获取调度智能体
-    scheduler = dumplingsAI.agent_list["scheduler_agent"]
+    scheduler = tangyuanAI.agent_list["scheduler_agent"]
 
     # 发起对话
     print("\n[用户] 请帮我查询现在的时间，并搜索一下今天有什么新闻")
@@ -595,7 +595,7 @@ python main.py
 
 ```python
 # 测试单个 Agent
-agent = dumplingsAI.agent_list["my_agent"]
+agent = tangyuanAI.agent_list["my_agent"]
 
 # 测试对话
 response = agent.conversation_with_tool("你好")
@@ -617,11 +617,11 @@ print(result)
 
 ```python
 # 查看所有已注册工具
-tools = dumplingsAI.tool_registry.list_tools()
+tools = tangyuanAI.tool_registry.list_tools()
 print(tools)
 
 # 查看特定 Agent 可用的工具
-agent_tools = dumplingsAI.tool_registry.get_all_tools_info(agent_uuid)
+agent_tools = tangyuanAI.tool_registry.get_all_tools_info(agent_uuid)
 print(agent_tools)
 ```
 
@@ -666,7 +666,7 @@ prompt = """
 - **参数验证**: 检查必要参数
 
 ```python
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["my_agent"],
     name="safe_tool",
     description="安全的工具示例",
@@ -753,7 +753,7 @@ def safe_tool(**kwargs):
 
 - [README.md](README.md) - 项目概述和完整示例
 - [CLAUDE.md](CLAUDE.md) - 开发环境配置
-- [Dumplings/Agent_Base_.py](Dumplings/Agent_Base_.py) - BaseAgent 源码
-- [Dumplings/agent_tool.py](Dumplings/agent_tool.py) - 工具系统源码
+- [Tangyuan/Agent_Base_.py](Tangyuan/Agent_Base_.py) - BaseAgent 源码
+- [Tangyuan/agent_tool.py](Tangyuan/agent_tool.py) - 工具系统源码
 
 ---

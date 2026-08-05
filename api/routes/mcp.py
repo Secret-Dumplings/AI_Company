@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import List
 
-import dumplingsAI
+import tangyuanAI
 from fastapi import APIRouter, HTTPException
 
 from ..models import (
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/mcp", tags=["mcp"])
 async def register_mcp(req: MCPRegisterRequest) -> dict:
     """注册一个 MCP 服务器（拉起 stdio 进程，把它的所有工具 + 资源注册为标准 tool）"""
     try:
-        dumplingsAI.register_mcp_tools(
+        tangyuanAI.register_mcp_tools(
             server_path=req.server_path,
             register_resources=req.register_resources,
             allowed_agents=req.allowed_agents,
@@ -44,7 +44,7 @@ async def register_mcp(req: MCPRegisterRequest) -> dict:
 @router.get("/sessions", response_model=MCPSessionListResponse)
 async def list_sessions() -> MCPSessionListResponse:
     """列出全部 MCP 会话及其工具数"""
-    raw = dumplingsAI.get_session_info() or {}
+    raw = tangyuanAI.get_session_info() or {}
     items: List[MCPSessionInfo] = []
     for path, info in raw.items():
         items.append(
@@ -61,7 +61,7 @@ async def list_sessions() -> MCPSessionListResponse:
 @router.get("/sessions/{server_path}")
 async def get_session(server_path: str) -> dict:
     """单个会话的详情（含 tools / resources 名称列表）"""
-    info = dumplingsAI.get_session_info(server_path)
+    info = tangyuanAI.get_session_info(server_path)
     if not info:
         raise HTTPException(status_code=404, detail=f"MCP 会话不存在：{server_path!r}")
     return {"server_path": server_path, **info}
@@ -77,12 +77,12 @@ async def close_all_sessions() -> dict:
     这里做兼容：优先用 sync 版（在外部进程如 CLI 跑），fallback 到 async 版。
     """
     try:
-        n = dumplingsAI.close_all_mcp_sessions_sync()
+        n = tangyuanAI.close_all_mcp_sessions_sync()
     except RuntimeError as e:
         msg = str(e)
         if "running" not in msg:
             raise
-        from dumplingsAI.mcp_bridge import close_all_mcp_sessions as _async
+        from tangyuanAI.mcp_bridge import close_all_mcp_sessions as _async
         n = await _async()
     return {"status": "ok", "closed": n}
 
@@ -90,7 +90,7 @@ async def close_all_sessions() -> dict:
 @router.delete("/sessions/{server_path}")
 async def close_session(server_path: str) -> dict:
     """关闭单个 MCP 会话"""
-    ok = dumplingsAI.close_mcp_session_sync(server_path)
+    ok = tangyuanAI.close_mcp_session_sync(server_path)
     return {"status": "ok" if ok else "not_found", "server_path": server_path}
 
 
@@ -103,13 +103,13 @@ async def start_health_check(req: MCPHealthCheckRequest) -> dict:
     _global_session_pool.start_health_check 需要已经存在的 event loop。
     """
     try:
-        dumplingsAI.start_health_check(interval=req.interval)
+        tangyuanAI.start_health_check(interval=req.interval)
     except RuntimeError as e:
         msg = str(e)
         if "running" not in msg and "already running" not in msg:
             raise
         import asyncio as _asyncio
-        from dumplingsAI.mcp_bridge import _global_session_pool
+        from tangyuanAI.mcp_bridge import _global_session_pool
         _asyncio.create_task(_global_session_pool.start_health_check(req.interval))
     return {"status": "ok", "interval": req.interval}
 
@@ -118,12 +118,12 @@ async def start_health_check(req: MCPHealthCheckRequest) -> dict:
 async def stop_health_check() -> dict:
     """停止会话池健康检查"""
     try:
-        dumplingsAI.stop_health_check()
+        tangyuanAI.stop_health_check()
     except RuntimeError as e:
         msg = str(e)
         if "running" not in msg and "already running" not in msg:
             raise
         import asyncio as _asyncio
-        from dumplingsAI.mcp_bridge import _global_session_pool
+        from tangyuanAI.mcp_bridge import _global_session_pool
         _asyncio.create_task(_global_session_pool.stop_health_check())
     return {"status": "ok"}

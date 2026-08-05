@@ -1,7 +1,7 @@
 # AI Company API 扩展层
 
-把 [`dumplingsAI`](../Dumplings/) 暴露为 HTTP API，让远程客户端（Web 前端 / 移动端 / CLI / 其他服务）
-通过 HTTP 调用 Agent。**`dumplingsAI` 子包完全不动**——本目录是 *纯扩展*。
+把 [`tangyuanAI`](../Tangyuan/) 暴露为 HTTP API，让远程客户端（Web 前端 / 移动端 / CLI / 其他服务）
+通过 HTTP 调用 Agent。**`tangyuanAI` 子包完全不动**——本目录是 *纯扩展*。
 
 ## 架构
 
@@ -18,7 +18,7 @@
                      │  Python API
                      ▼
 ┌─────────────────────────────────────────────────┐
-│  dumplingsAI  (BaseAgent / AnthropicAgent /     │
+│  tangyuanAI  (BaseAgent / AnthropicAgent /     │
 │  tool_registry / agent_list / llm_transport)    │
 └─────────────────────────────────────────────────┘
 ```
@@ -31,10 +31,10 @@
 
 ```python
 import os, uuid
-import dumplingsAI
+import tangyuanAI
 
-@dumplingsAI.register_agent(uuid.uuid4().hex, "my_agent")
-class MyAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.register_agent(uuid.uuid4().hex, "my_agent")
+class MyAgent(tangyuanAI.BaseAgent):
     prompt = "你是一个助手"
     api_provider = "https://api.example.com/v1/chat/completions"
     model_name = os.getenv("OPENAI_MODEL")
@@ -264,14 +264,14 @@ uv run pytest tests/test_api.py -v
 测试用两个本地 mock HTTP server（OpenAI + Anthropic）模拟真实 wire 协议，让 Agent 走完
 `transport → SSE 解析 → tool_call 抽取 → out 事件链` 全链路，再验证 HTTP 端点是否正确分发。
 
-## 与 dumplingsAI 的关系
+## 与 tangyuanAI 的关系
 
 | 层级 | 文件 | 角色 |
 |------|------|------|
-| 框架核心 | `Dumplings/` | LLM Transport / Agent 注册 / 工具系统 |
+| 框架核心 | `Tangyuan/` | LLM Transport / Agent 注册 / 工具系统 |
 | HTTP 扩展层 | `api/`（本目录） | 把框架能力暴露为 HTTP API |
 
-`api/` 通过 `import dumplingsAI` 使用框架能力，**从不**修改 `Dumplings/` 子模块。
+`api/` 通过 `import tangyuanAI` 使用框架能力，**从不**修改 `Tangyuan/` 子模块。
 
 ## 限制
 
@@ -286,5 +286,5 @@ uv run pytest tests/test_api.py -v
 
 ## 覆盖度
 
-完整覆盖 dumplingsAI `__all__` 18 个公开 API 的 18/18 + Agent / 工具方法的全套常用子集。
+完整覆盖 tangyuanAI `__all__` 18 个公开 API 的 18/18 + Agent / 工具方法的全套常用子集。
 详见 `tests/test_api.py`（25 个测试）。

@@ -19,3 +19,15 @@ web-ui/.env.local
 CLAUDE.md
 AGENTS.md
 .cursorrules
+.claude/
+
+# 旧目录残留副本（git rename 到 Tangyuan/ 后，本地工作树的 Dumplings/ 不再跟踪）
+/Dumplings/
+
+# Agent 状态持久化文件（v0.4.0+ 改名后是 .tangyuanAI_sessions*；旧名仅为遗留兼容）
+.tangyuanAI_sessions/
+.tangyuanAI_sessions.db
+.dumplingsAI_sessions/
+.dumplingsAI_sessions.db
+*.duas
+*.duas.gz

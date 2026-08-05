@@ -1,5 +1,5 @@
 """
-Agent 配置示例 —— 业务方在这个文件里写 @register_agent。
+Agent 配置示例 —— 业务方在这个文件里写 @template_agent。
 
 启动方式::
 
@@ -12,19 +12,25 @@ Agent 配置示例 —— 业务方在这个文件里写 @register_agent。
     # 跳过加载
     AGENTS_CONFIG="" uv run uvicorn api.app:app --reload
 
-只要 import 这个文件，@register_agent 装饰器就会把 Agent 写进
-``dumplingsAI.agent_list``，启动后所有 ``GET /agents`` 都能看到。
+只要 import 这个文件，@template_agent 装饰器就把 Agent 类登记到
+``agent_template_pool``；需要实例化时调 ``tangyuanAI.activate_template(name)``
+（API 启动时 app.py 会自动激活所有已登记模板）。
 """
 
 import os
 import uuid
 
-import dumplingsAI
+import tangyuanAI
+from tangyuanAI.Agent_list import activate_template
 
 
 # 示例 Agent 1：单 Agent 基础用法（OpenAI 协议）
-@dumplingsAI.register_agent(uuid.uuid4().hex, "api_demo_agent")
-class APIDemoAgent(dumplingsAI.BaseAgent):
+@tangyuanAI.template_agent(
+    "api_demo_agent",
+    uuid=uuid.uuid4().hex,
+    description="HTTP API 演示 Agent（OpenAI 协议）",
+)
+class APIDemoAgent(tangyuanAI.BaseAgent):
     """HTTP API 演示 Agent"""
     prompt = "你是一个友好的助手，用简洁的中文回答用户问题。"
     api_provider = "https://api.example.com/v1/chat/completions"
@@ -34,8 +40,12 @@ class APIDemoAgent(dumplingsAI.BaseAgent):
 
 
 # 示例 Agent 2：用统一的 Agent + protocol 字段切到 Anthropic
-@dumplingsAI.register_agent(uuid.uuid4().hex, "api_claude_agent")
-class APIClaudeAgent(dumplingsAI.Agent):
+@tangyuanAI.template_agent(
+    "api_claude_agent",
+    uuid=uuid.uuid4().hex,
+    description="HTTP API 演示 Agent（Anthropic 协议）",
+)
+class APIClaudeAgent(tangyuanAI.Agent):
     """HTTP API 演示 Agent（Anthropic 协议）"""
     protocol = "anthropic"
     prompt = "你是一个友好的助手，用简洁的中文回答用户问题。"
@@ -45,7 +55,7 @@ class APIClaudeAgent(dumplingsAI.Agent):
 
 
 # 示例工具
-@dumplingsAI.tool_registry.register_tool(
+@tangyuanAI.tool_registry.register_tool(
     allowed_agents=["api_demo_agent"],
     name="echo",
     description="原样回显用户输入（演示用）",
@@ -57,3 +67,8 @@ class APIClaudeAgent(dumplingsAI.Agent):
 )
 def echo(text: str) -> str:
     return f"echo: {text}"
+
+
+# 在 import 时自动激活（让 GET /agents 立即能看到）
+activate_template("api_demo_agent")
+activate_template("api_claude_agent")

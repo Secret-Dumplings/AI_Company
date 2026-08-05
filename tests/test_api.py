@@ -40,7 +40,7 @@ if str(_ROOT) not in sys.path:
 # ---------------------------------------------------------------------------
 
 def _make_openai_sse_chunks(text: str = "hello world", tool_calls: Optional[list] = None) -> list:
-    """构造 OpenAI Chat Completions 的 SSE 流（与 dumplingsAI.llm_transport.HttpxOpenAITransport 期望的格式一致）"""
+    """构造 OpenAI Chat Completions 的 SSE 流（与 tangyuanAI.llm_transport.HttpxOpenAITransport 期望的格式一致）"""
     chunks = []
     chunks.append({
         "id": "chatcmpl-test",
@@ -86,7 +86,7 @@ def _make_openai_sse_chunks(text: str = "hello world", tool_calls: Optional[list
 
 
 def _make_anthropic_sse_events(text: str = "hello world") -> list:
-    """构造 Anthropic Messages API 的 SSE 流（与 dumplingsAI.llm_transport.HttpxAnthropicTransport 期望的格式一致）"""
+    """构造 Anthropic Messages API 的 SSE 流（与 tangyuanAI.llm_transport.HttpxAnthropicTransport 期望的格式一致）"""
     events = []
     events.append({
         "type": "message_start",
@@ -221,7 +221,7 @@ def client(mock_urls):
 
     # 2. 把 agent 的 api_provider 指向 mock server（类属性）
     #    patch 完成后 yield，fixture 结束时会还原
-    import dumplingsAI as _da
+    import tangyuanAI as _da
 
     openai_url = mock_urls["openai_url"]
     anthropic_url = mock_urls["anthropic_url"]
